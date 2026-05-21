@@ -1,0 +1,675 @@
+# Interview Prep Backend
+
+Backend для сервиса подготовки к техническому собеседованию в формате: пользователь выбирает профессию, проходит тест, отвечает на вопросы разных типов, получает пояснение после каждого ответа и итоговый результат.
+
+Документ ориентирован на frontend-разработчика: как запустить сервер, какие ручки дергать, как хранить токен, какие JSON-структуры ожидать и отправлять.
+
+## Быстрый Старт
+
+Требования:
+
+```text
+Java 21
+Maven Wrapper уже есть в проекте
+```
+
+Запуск backend:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+Проверка тестов backend:
+
+```powershell
+.\mvnw.cmd test
+```
+
+API будет доступен по адресу:
+
+```text
+http://localhost:8080/api
+```
+
+H2 Console:
+
+```text
+http://localhost:8080/h2-console
+```
+
+JDBC URL для H2:
+
+```text
+jdbc:h2:mem:interview_prep
+```
+
+## CORS
+
+Backend уже разрешает запросы с популярных frontend dev-серверов:
+
+```text
+http://localhost:3000
+http://localhost:5173
+```
+
+То есть React/Vite-клиент с `localhost:5173` должен подключаться без дополнительной настройки CORS.
+
+## Базовая Схема Работы Клиента
+
+1. Пользователь регистрируется или логинится.
+2. Backend возвращает `token`.
+3. Frontend сохраняет токен, например в `localStorage`.
+4. Frontend получает список профессий и тестов.
+5. Пользователь выбирает тест.
+6. Frontend стартует попытку прохождения.
+7. Backend возвращает первый вопрос.
+8. Пользователь отвечает.
+9. Backend возвращает `correct`, `explanation`, `readMoreUrl` и следующий вопрос.
+10. После последнего ответа backend возвращает итоговый `result`.
+11. В профиле можно получить последние завершенные попытки.
+
+## Авторизация
+
+Регистрация:
+
+```http
+POST /api/auth/register
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "student@example.com",
+  "username": "Student",
+  "password": "secret123"
+}
+```
+
+Логин:
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "student@example.com",
+  "password": "secret123"
+}
+```
+
+Ответ регистрации и логина:
+
+```json
+{
+  "token": "generated-token",
+  "expiresAt": "2026-06-05T10:00:00Z",
+  "user": {
+    "id": 1,
+    "email": "student@example.com",
+    "username": "Student"
+  }
+}
+```
+
+Все защищенные запросы отправляй с заголовком:
+
+```http
+Authorization: Bearer generated-token
+```
+
+Проверка текущего пользователя:
+
+```http
+GET /api/auth/me
+Authorization: Bearer generated-token
+```
+
+Выход:
+
+```http
+POST /api/auth/logout
+Authorization: Bearer generated-token
+```
+
+На frontend обычно достаточно удалить токен из `localStorage` после успешного logout.
+
+## Пример API-Клиента
+
+Минимальный вариант на TypeScript:
+
+```ts
+const API_URL = "http://localhost:8080/api";
+
+export function getToken() {
+  return localStorage.getItem("token");
+}
+
+export function setToken(token: string) {
+  localStorage.setItem("token", token);
+}
+
+export function clearToken() {
+  localStorage.removeItem("token");
+}
+
+export async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getToken();
+  const headers = new Headers(options.headers);
+
+  headers.set("Content-Type", "application/json");
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || `HTTP ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json();
+}
+```
+
+Пример логина:
+
+```ts
+type AuthResponse = {
+  token: string;
+  expiresAt: string;
+  user: {
+    id: number;
+    email: string;
+    username: string;
+  };
+};
+
+const auth = await apiFetch<AuthResponse>("/auth/login", {
+  method: "POST",
+  body: JSON.stringify({
+    email,
+    password
+  })
+});
+
+setToken(auth.token);
+```
+
+## Профессии И Тесты
+
+Получить список профессий:
+
+```http
+GET /api/professions
+```
+
+Пример ответа:
+
+```json
+[
+  {
+    "id": 1,
+    "title": "Backend Java Developer",
+    "description": "Базовая проверка знаний Java, HTTP, SQL, Spring и REST API для junior backend-разработчика.",
+    "tests": [
+      {
+        "id": 1,
+        "title": "Java Backend: базовое собеседование",
+        "description": "7 вопросов разных типов: один ответ, несколько ответов, соответствие и короткий текст.",
+        "questionCount": 7
+      }
+    ]
+  }
+]
+```
+
+Получить детали теста:
+
+```http
+GET /api/tests/{testId}
+```
+
+Важно: backend не отдает правильные ответы в `GET /tests/{testId}`. Клиент получает только данные, нужные для отображения вопросов.
+
+## Типы Вопросов
+
+Backend использует 4 типа вопросов:
+
+```text
+SINGLE_CHOICE
+MULTIPLE_CHOICE
+MATCHING
+SHORT_TEXT
+```
+
+### SINGLE_CHOICE
+
+Пользователь выбирает один вариант.
+
+Пример вопроса:
+
+```json
+{
+  "id": 1,
+  "position": 1,
+  "type": "SINGLE_CHOICE",
+  "topic": "HTTP",
+  "prompt": "Какой HTTP-метод обычно используют для получения ресурса без изменения состояния сервера?",
+  "options": [
+    {
+      "id": 1,
+      "text": "GET"
+    },
+    {
+      "id": 2,
+      "text": "POST"
+    }
+  ],
+  "matchLeftItems": [],
+  "matchRightItems": []
+}
+```
+
+Что рисовать на frontend:
+
+```text
+radio group
+```
+
+Что отправлять:
+
+```json
+{
+  "selectedOptionIds": [1]
+}
+```
+
+Да, даже для одного выбранного варианта отправляется массив. Это сделано, чтобы single choice и multiple choice обрабатывались единообразно.
+
+### MULTIPLE_CHOICE
+
+Пользователь выбирает несколько вариантов.
+
+Что рисовать на frontend:
+
+```text
+checkbox group
+```
+
+Что отправлять:
+
+```json
+{
+  "selectedOptionIds": [4, 5, 8]
+}
+```
+
+Frontend не должен знать, какие варианты правильные. Он просто отправляет id тех options, которые выбрал пользователь.
+
+### MATCHING
+
+Пользователь сопоставляет элементы из левой колонки с элементами из правой.
+
+Пример вопроса:
+
+```json
+{
+  "id": 3,
+  "position": 3,
+  "type": "MATCHING",
+  "topic": "SQL",
+  "prompt": "Сопоставь SQL-операцию с ее назначением.",
+  "options": [],
+  "matchLeftItems": ["SELECT", "INSERT", "UPDATE", "DELETE"],
+  "matchRightItems": ["Добавление строки", "Изменение строки", "Получение данных", "Удаление строки"]
+}
+```
+
+Что рисовать на frontend:
+
+```text
+для каждого matchLeftItems элемент select/dropdown с вариантами из matchRightItems
+```
+
+Что отправлять:
+
+```json
+{
+  "matches": {
+    "SELECT": "Получение данных",
+    "INSERT": "Добавление строки",
+    "UPDATE": "Изменение строки",
+    "DELETE": "Удаление строки"
+  }
+}
+```
+
+### SHORT_TEXT
+
+Пользователь вводит короткий текст.
+
+Что рисовать на frontend:
+
+```text
+input или textarea
+```
+
+Что отправлять:
+
+```json
+{
+  "textAnswer": "extends"
+}
+```
+
+Backend нормализует регистр и пробелы, поэтому `extends`, ` Extends ` и `EXTENDS` будут считаться одинаковыми.
+
+## Прохождение Теста
+
+Старт попытки:
+
+```http
+POST /api/tests/{testId}/attempts
+Authorization: Bearer generated-token
+```
+
+Пример ответа:
+
+```json
+{
+  "attemptId": 1,
+  "question": {
+    "id": 1,
+    "position": 1,
+    "type": "SINGLE_CHOICE",
+    "topic": "HTTP",
+    "prompt": "Какой HTTP-метод обычно используют для получения ресурса без изменения состояния сервера?",
+    "options": [
+      {
+        "id": 1,
+        "text": "GET"
+      }
+    ],
+    "matchLeftItems": [],
+    "matchRightItems": []
+  }
+}
+```
+
+Получить текущее состояние попытки:
+
+```http
+GET /api/attempts/{attemptId}
+Authorization: Bearer generated-token
+```
+
+Пример ответа:
+
+```json
+{
+  "attemptId": 1,
+  "status": "IN_PROGRESS",
+  "currentPosition": 2,
+  "totalQuestions": 7,
+  "question": {
+    "id": 2,
+    "position": 2,
+    "type": "MULTIPLE_CHOICE",
+    "topic": "Java Collections",
+    "prompt": "Какие коллекции в Java обычно гарантируют уникальность элементов?",
+    "options": [],
+    "matchLeftItems": [],
+    "matchRightItems": []
+  }
+}
+```
+
+Отправить ответ:
+
+```http
+POST /api/attempts/{attemptId}/answer
+Authorization: Bearer generated-token
+Content-Type: application/json
+```
+
+Пример ответа backend после обычного вопроса:
+
+```json
+{
+  "correct": true,
+  "explanation": "GET предназначен для чтения ресурса. Он должен быть безопасным: сам запрос не должен менять состояние сервера.",
+  "readMoreUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/GET",
+  "nextQuestion": {
+    "id": 2,
+    "position": 2,
+    "type": "MULTIPLE_CHOICE",
+    "topic": "Java Collections",
+    "prompt": "Какие коллекции в Java обычно гарантируют уникальность элементов?",
+    "options": [],
+    "matchLeftItems": [],
+    "matchRightItems": []
+  },
+  "result": null
+}
+```
+
+Frontend-поведение:
+
+1. Пользователь нажал "Ответить".
+2. Клиент отправил ответ.
+3. Backend вернул `correct`, `explanation`, `readMoreUrl`.
+4. UI показывает, правильно или нет, и пояснение.
+5. Кнопка "Далее" берет `nextQuestion` из ответа и показывает его.
+
+После последнего вопроса `nextQuestion` будет `null`, а `result` будет заполнен.
+
+Пример финального ответа:
+
+```json
+{
+  "correct": true,
+  "explanation": "Класс наследует другой класс с помощью extends. Для реализации интерфейса используется implements.",
+  "readMoreUrl": "https://docs.oracle.com/javase/tutorial/java/IandI/subclasses.html",
+  "nextQuestion": null,
+  "result": {
+    "attemptId": 1,
+    "testTitle": "Java Backend: базовое собеседование",
+    "correctAnswers": 7,
+    "totalQuestions": 7,
+    "weakTopics": [],
+    "recommendation": "Отличный результат. Можно переходить к задачам уровня junior+ и практическим проектам.",
+    "completedAt": "2026-05-22T10:30:00Z"
+  }
+}
+```
+
+Получить результат отдельно:
+
+```http
+GET /api/attempts/{attemptId}/result
+Authorization: Bearer generated-token
+```
+
+Работает только после завершения попытки.
+
+## Профиль Пользователя
+
+```http
+GET /api/profile
+Authorization: Bearer generated-token
+```
+
+Пример ответа:
+
+```json
+{
+  "user": {
+    "id": 1,
+    "email": "student@example.com",
+    "username": "Student"
+  },
+  "recentAttempts": [
+    {
+      "attemptId": 1,
+      "professionTitle": "Backend Java Developer",
+      "testTitle": "Java Backend: базовое собеседование",
+      "correctAnswers": 7,
+      "totalQuestions": 7,
+      "completedAt": "2026-05-22T10:30:00Z"
+    }
+  ]
+}
+```
+
+На frontend это можно использовать для блока "Недавние тесты" в профиле.
+
+## Ошибки
+
+Backend возвращает ошибки в формате `ProblemDetail`.
+
+Пример:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "Authentication required"
+}
+```
+
+Частые статусы:
+
+```text
+400 Bad Request - неверный body, попытка уже завершена, повторный ответ
+401 Unauthorized - нет токена или неверный логин/пароль
+404 Not Found - тест или попытка не найдены
+```
+
+## Рекомендуемые Frontend-Роуты
+
+Это не требование backend, просто удобная схема для клиента:
+
+```text
+/login
+/register
+/profile
+/professions
+/tests/:testId
+/attempts/:attemptId
+/attempts/:attemptId/result
+```
+
+## TypeScript-Модели
+
+Можно положить рядом с API-клиентом:
+
+```ts
+export type QuestionType =
+  | "SINGLE_CHOICE"
+  | "MULTIPLE_CHOICE"
+  | "MATCHING"
+  | "SHORT_TEXT";
+
+export type User = {
+  id: number;
+  email: string;
+  username: string;
+};
+
+export type AuthResponse = {
+  token: string;
+  expiresAt: string;
+  user: User;
+};
+
+export type Option = {
+  id: number;
+  text: string;
+};
+
+export type Question = {
+  id: number;
+  position: number;
+  type: QuestionType;
+  topic: string;
+  prompt: string;
+  options: Option[];
+  matchLeftItems: string[];
+  matchRightItems: string[];
+};
+
+export type Profession = {
+  id: number;
+  title: string;
+  description: string;
+  tests: TestSummary[];
+};
+
+export type TestSummary = {
+  id: number;
+  title: string;
+  description: string;
+  questionCount: number;
+};
+
+export type AttemptState = {
+  attemptId: number;
+  status: "IN_PROGRESS" | "COMPLETED";
+  currentPosition: number;
+  totalQuestions: number;
+  question: Question | null;
+};
+
+export type AnswerRequest = {
+  selectedOptionIds?: number[];
+  matches?: Record<string, string>;
+  textAnswer?: string;
+};
+
+export type Result = {
+  attemptId: number;
+  testTitle: string;
+  correctAnswers: number;
+  totalQuestions: number;
+  weakTopics: string[];
+  recommendation: string;
+  completedAt: string;
+};
+
+export type AnswerResponse = {
+  correct: boolean;
+  explanation: string;
+  readMoreUrl: string;
+  nextQuestion: Question | null;
+  result: Result | null;
+};
+```
+
+## Полезные Документы
+
+Подробная краткая справка по API:
+
+```text
+API.md
+```
+
+Готовый сценарий проверок в Postman:
+
+```text
+POSTMAN_TESTS.md
+```
