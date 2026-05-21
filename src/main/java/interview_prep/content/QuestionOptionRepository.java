@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface QuestionOptionRepository extends JpaRepository<QuestionOption, Long> {
     List<QuestionOption> findByQuestionIdOrderById(Long questionId);
+
+    void deleteByQuestionId(Long questionId);
 }

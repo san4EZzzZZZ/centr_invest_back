@@ -2,6 +2,8 @@ package interview_prep.auth;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -31,6 +33,10 @@ public class UserAccount {
     @Column(nullable = false)
     private String passwordHash;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserRole role = UserRole.USER;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -38,5 +44,10 @@ public class UserAccount {
         this.email = email;
         this.username = username;
         this.passwordHash = passwordHash;
+    }
+
+    public UserAccount(String email, String username, String passwordHash, UserRole role) {
+        this(email, username, passwordHash);
+        this.role = role;
     }
 }

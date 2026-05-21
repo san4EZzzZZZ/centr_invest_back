@@ -1,5 +1,6 @@
 package interview_prep.common;
 
+import interview_prep.auth.ForbiddenException;
 import interview_prep.auth.UnauthorizedException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -13,6 +14,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(UnauthorizedException.class)
     ProblemDetail unauthorized(UnauthorizedException exception) {
         return problem(HttpStatus.UNAUTHORIZED, exception.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    ProblemDetail forbidden(ForbiddenException exception) {
+        return problem(HttpStatus.FORBIDDEN, exception.getMessage());
     }
 
     @ExceptionHandler(EntityNotFoundException.class)

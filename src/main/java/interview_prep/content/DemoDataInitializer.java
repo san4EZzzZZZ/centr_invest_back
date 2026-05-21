@@ -1,6 +1,10 @@
 package interview_prep.content;
 
+import interview_prep.auth.UserAccount;
+import interview_prep.auth.UserAccountRepository;
+import interview_prep.auth.UserRole;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,20 +15,25 @@ public class DemoDataInitializer implements CommandLineRunner {
     private final QuestionRepository questions;
     private final QuestionOptionRepository options;
     private final MatchPairRepository pairs;
+    private final UserAccountRepository users;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public DemoDataInitializer(ProfessionRepository professions, InterviewTestRepository tests,
                                QuestionRepository questions, QuestionOptionRepository options,
-                               MatchPairRepository pairs) {
+                               MatchPairRepository pairs, UserAccountRepository users) {
         this.professions = professions;
         this.tests = tests;
         this.questions = questions;
         this.options = options;
         this.pairs = pairs;
+        this.users = users;
     }
 
     @Override
     @Transactional
     public void run(String... args) {
+        seedAdmin();
+
         if (professions.existsByTitle("Backend Java Developer")) {
             return;
         }
@@ -105,5 +114,18 @@ public class DemoDataInitializer implements CommandLineRunner {
     private Question question(InterviewTest test, int position, QuestionType type, String topic, String prompt,
                               String correctTextAnswer, String explanation, String readMoreUrl) {
         return questions.save(new Question(test, position, type, topic, prompt, correctTextAnswer, explanation, readMoreUrl));
+    }
+
+    private void seedAdmin() {
+        if (users.existsByEmailIgnoreCase("admin@example.com")) {
+            return;
+        }
+
+        users.save(new UserAccount(
+                "admin@example.com",
+                "Admin",
+                passwordEncoder.encode("admin123"),
+                UserRole.ADMIN
+        ));
     }
 }

@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface MatchPairRepository extends JpaRepository<MatchPair, Long> {
     List<MatchPair> findByQuestionIdOrderById(Long questionId);
+
+    void deleteByQuestionId(Long questionId);
 }

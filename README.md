@@ -70,6 +70,16 @@ http://localhost:5173
 
 ## Авторизация
 
+При старте проекта автоматически создается тестовый администратор:
+
+```text
+email: admin@example.com
+password: admin123
+role: ADMIN
+```
+
+Через этот аккаунт можно заходить в админскую часть и создавать, редактировать, удалять тесты.
+
 Регистрация:
 
 ```http
@@ -108,7 +118,8 @@ Content-Type: application/json
   "user": {
     "id": 1,
     "email": "student@example.com",
-    "username": "Student"
+    "username": "Student",
+    "role": "USER"
   }
 }
 ```
@@ -537,6 +548,226 @@ Authorization: Bearer generated-token
 
 На frontend это можно использовать для блока "Недавние тесты" в профиле.
 
+## Админская Часть
+
+Админские ручки находятся под:
+
+```text
+/api/admin
+```
+
+Они требуют обычный `Bearer`-токен, но пользователь должен иметь роль `ADMIN`.
+
+Если токена нет, backend вернет `401`.
+Если токен есть, но роль не `ADMIN`, backend вернет `403`.
+
+### Логин Админа
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "admin@example.com",
+  "password": "admin123"
+}
+```
+
+Ответ будет таким же, как у обычного логина, но `user.role` будет `ADMIN`.
+
+### Получить Все Тесты Для Админки
+
+```http
+GET /api/admin/tests
+Authorization: Bearer admin-token
+```
+
+Пример ответа:
+
+```json
+[
+  {
+    "id": 1,
+    "professionId": 1,
+    "professionTitle": "Backend Java Developer",
+    "title": "Java Backend: базовое собеседование",
+    "description": "7 вопросов разных типов.",
+    "questionCount": 7
+  }
+]
+```
+
+### Получить Тест С Правильными Ответами
+
+```http
+GET /api/admin/tests/{testId}
+Authorization: Bearer admin-token
+```
+
+Эта ручка отличается от публичной `GET /api/tests/{testId}`: она отдает правильные ответы, поэтому доступна только админу.
+
+Пример фрагмента ответа:
+
+```json
+{
+  "id": 1,
+  "professionId": 1,
+  "professionTitle": "Backend Java Developer",
+  "title": "Java Backend: базовое собеседование",
+  "description": "7 вопросов разных типов.",
+  "questions": [
+    {
+      "id": 1,
+      "position": 1,
+      "type": "SINGLE_CHOICE",
+      "topic": "HTTP",
+      "prompt": "Какой HTTP-метод используют для получения ресурса?",
+      "correctTextAnswer": null,
+      "explanation": "GET предназначен для чтения ресурса.",
+      "readMoreUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/GET",
+      "options": [
+        {
+          "id": 1,
+          "text": "GET",
+          "correct": true
+        }
+      ],
+      "matchPairs": []
+    }
+  ]
+}
+```
+
+### Создать Тест
+
+```http
+POST /api/admin/tests
+Authorization: Bearer admin-token
+Content-Type: application/json
+```
+
+```json
+{
+  "professionId": 1,
+  "title": "Java Backend: новый тест",
+  "description": "Тест для проверки базовых знаний.",
+  "questions": [
+    {
+      "type": "SINGLE_CHOICE",
+      "topic": "HTTP",
+      "prompt": "Какой метод используют для чтения ресурса?",
+      "correctTextAnswer": null,
+      "explanation": "GET используют для получения ресурса без изменения состояния сервера.",
+      "readMoreUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/GET",
+      "options": [
+        {
+          "text": "GET",
+          "correct": true
+        },
+        {
+          "text": "POST",
+          "correct": false
+        }
+      ],
+      "matchPairs": []
+    },
+    {
+      "type": "MULTIPLE_CHOICE",
+      "topic": "REST",
+      "prompt": "Какие признаки относятся к REST API?",
+      "correctTextAnswer": null,
+      "explanation": "REST обычно строится вокруг ресурсов и стандартных HTTP-методов.",
+      "readMoreUrl": "https://restfulapi.net/",
+      "options": [
+        {
+          "text": "Ресурсы имеют URI",
+          "correct": true
+        },
+        {
+          "text": "Используются стандартные HTTP-методы",
+          "correct": true
+        },
+        {
+          "text": "Сервер хранит состояние UI каждого клиента",
+          "correct": false
+        }
+      ],
+      "matchPairs": []
+    },
+    {
+      "type": "MATCHING",
+      "topic": "SQL",
+      "prompt": "Сопоставь SQL-операцию с назначением.",
+      "correctTextAnswer": null,
+      "explanation": "SELECT читает данные, INSERT добавляет строки.",
+      "readMoreUrl": "https://www.postgresql.org/docs/current/tutorial-sql.html",
+      "options": [],
+      "matchPairs": [
+        {
+          "leftLabel": "SELECT",
+          "rightLabel": "Получение данных"
+        },
+        {
+          "leftLabel": "INSERT",
+          "rightLabel": "Добавление строки"
+        }
+      ]
+    },
+    {
+      "type": "SHORT_TEXT",
+      "topic": "Java Core",
+      "prompt": "Ключевое слово для наследования класса?",
+      "correctTextAnswer": "extends",
+      "explanation": "Для наследования класса используется extends.",
+      "readMoreUrl": "https://docs.oracle.com/javase/tutorial/java/IandI/subclasses.html",
+      "options": [],
+      "matchPairs": []
+    }
+  ]
+}
+```
+
+Правила валидации:
+
+```text
+SINGLE_CHOICE - минимум 2 options и ровно 1 correct=true
+MULTIPLE_CHOICE - минимум 2 options и минимум 1 correct=true
+MATCHING - нужен непустой matchPairs
+SHORT_TEXT - нужен correctTextAnswer
+```
+
+### Редактировать Тест
+
+```http
+PUT /api/admin/tests/{testId}
+Authorization: Bearer admin-token
+Content-Type: application/json
+```
+
+Body такой же, как у создания.
+
+Важно: сейчас `PUT` полностью заменяет вопросы теста. Старые попытки прохождения этого теста удаляются, потому что их ответы могут не соответствовать новой версии вопросов.
+
+### Удалить Тест
+
+```http
+DELETE /api/admin/tests/{testId}
+Authorization: Bearer admin-token
+```
+
+Удаляются:
+
+```text
+test
+questions
+options
+matching pairs
+attempts
+attempt answers
+```
+
 ## Ошибки
 
 Backend возвращает ошибки в формате `ProblemDetail`.
@@ -589,6 +820,7 @@ export type User = {
   id: number;
   email: string;
   username: string;
+  role: "USER" | "ADMIN";
 };
 
 export type AuthResponse = {

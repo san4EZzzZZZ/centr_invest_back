@@ -4,6 +4,14 @@ Base URL: `http://localhost:8080/api`
 
 ## Auth
 
+Seeded admin account:
+
+```text
+email: admin@example.com
+password: admin123
+role: ADMIN
+```
+
 `POST /auth/register`
 
 ```json
@@ -114,3 +122,73 @@ Returns final score, weak topics, and recommendation. Available after completion
 `GET /profile`
 
 Returns the current user and 5 latest completed attempts.
+
+## Admin Tests
+
+All admin endpoints require:
+
+```text
+Authorization: Bearer admin-token
+```
+
+The token must belong to a user with `role = ADMIN`.
+
+`GET /admin/tests`
+
+Returns all tests with profession info and question counts.
+
+`GET /admin/tests/{testId}`
+
+Returns test details with correct answers. This endpoint is admin-only because it exposes option `correct` flags and `correctTextAnswer`.
+
+`POST /admin/tests`
+
+Creates a test with questions.
+
+`PUT /admin/tests/{testId}`
+
+Fully replaces test metadata and questions. Existing attempts for this test are deleted because old answers would no longer match the new question set.
+
+`DELETE /admin/tests/{testId}`
+
+Deletes test, questions, options, matching pairs, attempts, and answers.
+
+Create/update request example:
+
+```json
+{
+  "professionId": 1,
+  "title": "Java Backend: новый тест",
+  "description": "Тест для проверки базовых знаний.",
+  "questions": [
+    {
+      "type": "SINGLE_CHOICE",
+      "topic": "HTTP",
+      "prompt": "Какой метод используют для чтения ресурса?",
+      "explanation": "GET используют для получения ресурса без изменения состояния сервера.",
+      "readMoreUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/GET",
+      "options": [
+        {
+          "text": "GET",
+          "correct": true
+        },
+        {
+          "text": "POST",
+          "correct": false
+        }
+      ],
+      "matchPairs": []
+    },
+    {
+      "type": "SHORT_TEXT",
+      "topic": "Java Core",
+      "prompt": "Ключевое слово для наследования класса?",
+      "correctTextAnswer": "extends",
+      "explanation": "Для наследования класса используется extends.",
+      "readMoreUrl": "https://docs.oracle.com/javase/tutorial/java/IandI/subclasses.html",
+      "options": [],
+      "matchPairs": []
+    }
+  ]
+}
+```
