@@ -35,6 +35,7 @@ public class DemoDataInitializer implements CommandLineRunner {
         seedAdmin();
 
         if (professions.existsByTitle("Backend Java Developer")) {
+            attachLegacyQuestionsToDemoTest();
             return;
         }
 
@@ -49,7 +50,7 @@ public class DemoDataInitializer implements CommandLineRunner {
                 "7 вопросов разных типов: один ответ, несколько ответов, соответствие и короткий текст."
         ));
 
-        Question q1 = question(backend, 1, QuestionType.SINGLE_CHOICE, "HTTP",
+        Question q1 = question(backend, javaBasics, 1, QuestionType.SINGLE_CHOICE, "HTTP",
                 "Какой HTTP-метод обычно используют для получения ресурса без изменения состояния сервера?",
                 null,
                 "GET предназначен для чтения ресурса. Он должен быть безопасным: сам запрос не должен менять состояние сервера.",
@@ -59,7 +60,7 @@ public class DemoDataInitializer implements CommandLineRunner {
         options.save(new QuestionOption(q1, "PATCH", false));
         options.save(new QuestionOption(q1, "DELETE", false));
 
-        Question q2 = question(backend, 2, QuestionType.MULTIPLE_CHOICE, "Java Collections",
+        Question q2 = question(backend, javaBasics, 2, QuestionType.MULTIPLE_CHOICE, "Java Collections",
                 "Какие коллекции в Java обычно гарантируют уникальность элементов?",
                 null,
                 "Интерфейс Set описывает набор уникальных элементов. HashSet и TreeSet являются его распространенными реализациями.",
@@ -69,7 +70,7 @@ public class DemoDataInitializer implements CommandLineRunner {
         options.save(new QuestionOption(q2, "TreeSet", true));
         options.save(new QuestionOption(q2, "LinkedList", false));
 
-        Question q3 = question(backend, 3, QuestionType.MATCHING, "SQL",
+        Question q3 = question(backend, javaBasics, 3, QuestionType.MATCHING, "SQL",
                 "Сопоставь SQL-операцию с ее назначением.",
                 null,
                 "SELECT читает данные, INSERT добавляет строки, UPDATE изменяет существующие строки, DELETE удаляет строки.",
@@ -79,13 +80,13 @@ public class DemoDataInitializer implements CommandLineRunner {
         pairs.save(new MatchPair(q3, "UPDATE", "Изменение строки"));
         pairs.save(new MatchPair(q3, "DELETE", "Удаление строки"));
 
-        question(backend, 4, QuestionType.SHORT_TEXT, "Spring",
+        question(backend, javaBasics, 4, QuestionType.SHORT_TEXT, "Spring",
                 "Как называется Spring-аннотация, которой обычно помечают класс REST-контроллера?",
                 "@RestController",
                 "@RestController объединяет @Controller и @ResponseBody, поэтому методы возвращают данные в тело HTTP-ответа.",
                 "https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-restcontroller.html");
 
-        Question q5 = question(backend, 5, QuestionType.SINGLE_CHOICE, "JPA",
+        Question q5 = question(backend, javaBasics, 5, QuestionType.SINGLE_CHOICE, "JPA",
                 "Что обычно означает аннотация @Entity в JPA?",
                 null,
                 "@Entity помечает класс как сущность, состояние которой может сохраняться в таблице базы данных.",
@@ -95,7 +96,7 @@ public class DemoDataInitializer implements CommandLineRunner {
         options.save(new QuestionOption(q5, "Метод будет выполнен в транзакции", false));
         options.save(new QuestionOption(q5, "Поле нельзя записывать в базу", false));
 
-        Question q6 = question(backend, 6, QuestionType.MULTIPLE_CHOICE, "REST",
+        Question q6 = question(backend, javaBasics, 6, QuestionType.MULTIPLE_CHOICE, "REST",
                 "Какие признаки обычно относятся к REST API?",
                 null,
                 "REST строится вокруг ресурсов, стандартных HTTP-методов и статeless-взаимодействия между клиентом и сервером.",
@@ -105,16 +106,27 @@ public class DemoDataInitializer implements CommandLineRunner {
         options.save(new QuestionOption(q6, "Используются стандартные HTTP-методы", true));
         options.save(new QuestionOption(q6, "Каждый запрос должен содержать достаточно контекста для обработки", true));
 
-        question(backend, 7, QuestionType.SHORT_TEXT, "Java Core",
+        question(backend, javaBasics, 7, QuestionType.SHORT_TEXT, "Java Core",
                 "Какое ключевое слово в Java используется для наследования класса?",
                 "extends",
                 "Класс наследует другой класс с помощью extends. Для реализации интерфейса используется implements.",
                 "https://docs.oracle.com/javase/tutorial/java/IandI/subclasses.html");
     }
 
-    private Question question(Profession profession, int position, QuestionType type, String topic, String prompt,
+    private Question question(Profession profession, InterviewTest test, int position, QuestionType type, String topic, String prompt,
                               String correctTextAnswer, String explanation, String readMoreUrl) {
-        return questions.save(new Question(profession, position, type, topic, prompt, correctTextAnswer, explanation, readMoreUrl));
+        return questions.save(new Question(profession, test, position, type, topic, prompt, correctTextAnswer, explanation, readMoreUrl));
+    }
+
+    private void attachLegacyQuestionsToDemoTest() {
+        professions.findByTitle("Backend Java Developer")
+                .flatMap(profession -> tests.findByProfessionIdOrderByTitle(profession.getId()).stream().findFirst())
+                .ifPresent(test -> questions.findByProfessionIdOrderByPosition(test.getProfession().getId()).stream()
+                        .filter(question -> question.getTest() == null)
+                        .forEach(question -> {
+                            question.setTest(test);
+                            questions.save(question);
+                        }));
     }
 
     private void seedAdmin() {

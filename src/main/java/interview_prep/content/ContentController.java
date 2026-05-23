@@ -1,6 +1,7 @@
 package interview_prep.content;
 
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -28,6 +29,7 @@ public class ContentController {
     }
 
     @GetMapping("/professions")
+    @Transactional(readOnly = true)
     public List<ContentDtos.ProfessionResponse> professions(@RequestParam(required = false) String title,
                                                             @RequestParam(required = false) String profession) {
         if (hasText(title) || hasText(profession)) {
@@ -45,7 +47,7 @@ public class ContentController {
                                         test.getTitle(),
                                         test.getShortDescription(),
                                         test.getDescription(),
-                                        (int) questions.countByProfessionId(foundProfession.getId())
+                                        questionCount(test)
                                 ))
                                 .toList()
                 ))
@@ -53,6 +55,7 @@ public class ContentController {
     }
 
     @GetMapping("/tests/{testId}")
+    @Transactional(readOnly = true)
     public ContentDtos.TestResponse test(@PathVariable Long testId) {
         InterviewTest test = tests.findById(testId)
                 .orElseThrow(() -> new EntityNotFoundException("Test not found"));
@@ -62,14 +65,14 @@ public class ContentController {
                 test.getTitle(),
                 test.getShortDescription(),
                 test.getDescription(),
-                questions.findByProfessionIdOrderByPosition(test.getProfession().getId()).stream()
+                questionsForTest(test).stream()
                         .map(mapper::toQuestionResponse)
                         .toList()
         );
     }
 
     private List<ContentDtos.ProfessionResponse> searchedProfessions(String title, String profession) {
-        return tests.search(title, profession).stream()
+        return findTests(title, profession).stream()
                 .collect(Collectors.groupingBy(InterviewTest::getProfession, LinkedHashMap::new, Collectors.toList()))
                 .entrySet()
                 .stream()
@@ -83,7 +86,7 @@ public class ContentController {
                                         test.getTitle(),
                                         test.getShortDescription(),
                                         test.getDescription(),
-                                        (int) questions.countByProfessionId(test.getProfession().getId())
+                                        questionCount(test)
                                 ))
                                 .toList()
                 ))
@@ -96,5 +99,26 @@ public class ContentController {
 
     private String blankToNull(String value) {
         return hasText(value) ? value.trim() : null;
+    }
+
+    private List<InterviewTest> findTests(String title, String profession) {
+        if (title != null && profession != null) {
+            return tests.searchByTitleAndProfession(title, profession);
+        }
+        if (title != null) {
+            return tests.searchByTitle(title);
+        }
+        if (profession != null) {
+            return tests.searchByProfession(profession);
+        }
+        return tests.findAllWithProfession();
+    }
+
+    private int questionCount(InterviewTest test) {
+        return (int) questions.countByTestId(test.getId());
+    }
+
+    private List<Question> questionsForTest(InterviewTest test) {
+        return questions.findByTestIdOrderByPosition(test.getId());
     }
 }

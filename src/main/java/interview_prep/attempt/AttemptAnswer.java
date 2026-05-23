@@ -7,7 +7,6 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -33,8 +32,7 @@ public class AttemptAnswer {
     @Column(nullable = false)
     private boolean correct;
 
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "text")
     private String submittedAnswer;
 
     @Column(nullable = false)
@@ -42,7 +40,7 @@ public class AttemptAnswer {
 
     private Double aiConfidence;
 
-    @Lob
+    @Column(columnDefinition = "text")
     private String aiReason;
 
     @Column(nullable = false)

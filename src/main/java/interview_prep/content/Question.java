@@ -8,7 +8,6 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,6 +25,9 @@ public class Question {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     private Profession profession;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    private InterviewTest test;
+
     @Column(nullable = false)
     private int position;
 
@@ -42,16 +44,16 @@ public class Question {
     @Column(length = 300)
     private String correctTextAnswer;
 
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "text")
     private String explanation;
 
     @Column(nullable = false)
     private String readMoreUrl;
 
-    public Question(Profession profession, int position, QuestionType type, String topic, String prompt,
+    public Question(Profession profession, InterviewTest test, int position, QuestionType type, String topic, String prompt,
                     String correctTextAnswer, String explanation, String readMoreUrl) {
         this.profession = profession;
+        this.test = test;
         this.position = position;
         this.type = type;
         this.topic = topic;
@@ -59,5 +61,10 @@ public class Question {
         this.correctTextAnswer = correctTextAnswer;
         this.explanation = explanation;
         this.readMoreUrl = readMoreUrl;
+    }
+
+    public Question(Profession profession, int position, QuestionType type, String topic, String prompt,
+                    String correctTextAnswer, String explanation, String readMoreUrl) {
+        this(profession, null, position, type, topic, prompt, correctTextAnswer, explanation, readMoreUrl);
     }
 }

@@ -60,7 +60,7 @@ public class AttemptService {
                 .orElseThrow(() -> new EntityNotFoundException("Test not found"));
         List<Question> selectedQuestions = composeQuestions(test);
         if (selectedQuestions.isEmpty()) {
-            throw new IllegalArgumentException("Question pool is empty for this profession");
+            throw new IllegalArgumentException("Question pool is empty for this test");
         }
 
         TestAttempt attempt = attempts.save(new TestAttempt(user, test, selectedQuestions.size()));
@@ -176,18 +176,17 @@ public class AttemptService {
     }
 
     private List<Question> composeQuestions(InterviewTest test) {
-        Long professionId = test.getProfession().getId();
         List<Question> selected = new ArrayList<>();
-        selected.addAll(takeRandom(professionId, QuestionType.SINGLE_CHOICE, 2));
-        selected.addAll(takeRandom(professionId, QuestionType.MULTIPLE_CHOICE, 2));
-        selected.addAll(takeRandom(professionId, QuestionType.MATCHING, 1));
-        selected.addAll(takeRandom(professionId, QuestionType.SHORT_TEXT, 2));
+        selected.addAll(takeRandom(test, QuestionType.SINGLE_CHOICE, 2));
+        selected.addAll(takeRandom(test, QuestionType.MULTIPLE_CHOICE, 2));
+        selected.addAll(takeRandom(test, QuestionType.MATCHING, 1));
+        selected.addAll(takeRandom(test, QuestionType.SHORT_TEXT, 2));
         Collections.shuffle(selected);
         return selected;
     }
 
-    private List<Question> takeRandom(Long professionId, QuestionType type, int limit) {
-        List<Question> pool = new ArrayList<>(questions.findByProfessionIdAndTypeOrderByPosition(professionId, type));
+    private List<Question> takeRandom(InterviewTest test, QuestionType type, int limit) {
+        List<Question> pool = new ArrayList<>(questions.findByTestIdAndTypeOrderByPosition(test.getId(), type));
         Collections.shuffle(pool);
         return pool.stream().limit(limit).toList();
     }

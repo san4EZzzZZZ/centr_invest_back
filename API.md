@@ -69,7 +69,7 @@ GET /professions?title=java&profession=backend
 
 Returns full test metadata and questions without correct answers.
 
-Important: tests are now generated from a profession question pool. A test is not a fixed list of questions. When a user starts an attempt, the backend selects questions from the test profession pool:
+Important: each test owns its own question pool. A profession is only a catalog category for tests. When a user starts an attempt, the backend selects questions from the selected test pool:
 
 ```text
 up to 2 SINGLE_CHOICE
@@ -95,7 +95,7 @@ For `MATCHING`, the question contains `matchLeftItems` and `matchRightItems`; su
 
 `POST /tests/{testId}/attempts`
 
-Starts a new attempt, composes a concrete question set from the profession pool, stores it for this attempt, and returns the first question.
+Starts a new attempt, composes a concrete question set from the selected test pool, stores it for this attempt, and returns the first question.
 
 `GET /attempts/{attemptId}`
 
@@ -242,13 +242,13 @@ Returns test details with correct answers. This endpoint is admin-only because i
 
 Creates a test with questions.
 
-The questions from this request are added to the selected profession question pool. Attempts generated for tests of that profession will use this pool.
+The questions from this request are saved into the created test's own question pool.
 
 `PUT /admin/tests/{testId}`
 
 Fully replaces test metadata and questions. Existing attempts for this test are deleted because old answers would no longer match the new question set.
 
-In the current prototype, update also replaces the profession question pool provided in the request.
+Update replaces only this test's question pool. Other tests of the same profession are not changed.
 
 `DELETE /admin/tests/{testId}`
 

@@ -25,6 +25,19 @@ CREATE USER interview_prep WITH PASSWORD 'interview_prep';
 CREATE DATABASE interview_prep OWNER interview_prep;
 ```
 
+На Windows с PostgreSQL 16 это можно сделать так:
+
+```powershell
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "CREATE USER interview_prep WITH PASSWORD 'interview_prep';"
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "CREATE DATABASE interview_prep OWNER interview_prep;"
+```
+
+Если пользователь уже существует, но пароль не подходит:
+
+```powershell
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "ALTER USER interview_prep WITH PASSWORD 'interview_prep';"
+```
+
 По умолчанию backend подключается к базе:
 
 ```text
@@ -37,6 +50,12 @@ password: interview_prep
 
 ```powershell
 .\mvnw.cmd spring-boot:run
+```
+
+Если порт `8080` занят, можно запустить на другом порту:
+
+```powershell
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.arguments="--server.port=8081"
 ```
 
 Проверка тестов backend:
@@ -163,13 +182,17 @@ profession - часть названия профессии
 GET /api/tests/{testId}
 ```
 
-Публичная ручка не отдает правильные ответы. Она возвращает метаданные теста и пул вопросов профессии для отображения.
+Current implementation: this endpoint returns metadata and the question pool of this exact test. Correct answers are still hidden from public clients.
+
+Data model note: `profession` is a catalog grouping, `interview_test` is a concrete test, and `question.test_id` points to the test that owns the question. Questions are not shared automatically between tests of the same profession.
+
+Публичная ручка не отдает правильные ответы. Она возвращает метаданные теста и пул вопросов именно этого теста для отображения.
 
 ## Новая Логика Тестов
 
-Тест больше не хранит жесткий фиксированный список вопросов. Тест связан с профессией, а вопросы лежат в общем пуле этой профессии.
+Каждый тест хранит собственный пул вопросов. Профессия нужна как категория каталога, но вопросы не являются общими для всех тестов профессии.
 
-При старте попытки backend выбирает из пула:
+При старте попытки backend выбирает только из пула выбранного теста:
 
 ```text
 до 2 SINGLE_CHOICE
@@ -178,7 +201,7 @@ GET /api/tests/{testId}
 до 2 SHORT_TEXT
 ```
 
-Если вопросов какого-то типа меньше, backend берет все доступные вопросы этого типа. Выбранный набор фиксируется внутри попытки, поэтому уже начатая попытка не меняется, даже если админ потом отредактирует пул.
+Если вопросов какого-то типа меньше, backend берет все доступные вопросы этого типа из выбранного теста. Выбранный набор фиксируется внутри попытки, поэтому уже начатая попытка не меняется, даже если админ потом отредактирует пул.
 
 Типы вопросов:
 
@@ -413,6 +436,8 @@ Body для создания и редактирования:
 
 `shortDescription` обязателен для создания и редактирования теста.
 
+Current admin behavior: questions from `POST /api/admin/tests` and `PUT /api/admin/tests/{testId}` are saved into the pool of that exact test. `PUT` fully replaces only this test's pool and deletes attempts for this test.
+
 Правила валидации вопросов:
 
 ```text
@@ -422,7 +447,7 @@ MATCHING - нужен непустой matchPairs
 SHORT_TEXT - нужен correctTextAnswer
 ```
 
-В текущем прототипе вопросы из `POST`/`PUT` попадают в пул вопросов профессии. При `PUT` пул указанной профессии заменяется вопросами из запроса, а старые попытки по затронутой профессии удаляются, чтобы ответы не расходились с новой версией пула.
+Вопросы из `POST`/`PUT` попадают в пул конкретного теста. При `PUT` заменяется пул только редактируемого теста, а старые попытки этого теста удаляются, чтобы ответы не расходились с новой версией пула.
 
 ## Ошибки
 

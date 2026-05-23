@@ -54,7 +54,7 @@ public class AdminTestService {
     public List<AdminDtos.TestSummaryResponse> list(String title, String profession) {
         String titleFilter = blankToNull(title);
         String professionFilter = blankToNull(profession);
-        return tests.search(titleFilter, professionFilter).stream()
+        return findTests(titleFilter, professionFilter).stream()
                 .map(test -> new AdminDtos.TestSummaryResponse(
                         test.getId(),
                         test.getProfession().getId(),
@@ -62,7 +62,7 @@ public class AdminTestService {
                         test.getTitle(),
                         test.getShortDescription(),
                         test.getDescription(),
-                        (int) questions.countByProfessionId(test.getProfession().getId())
+                        (int) questions.countByTestId(test.getId())
                 ))
                 .toList();
     }
@@ -85,7 +85,7 @@ public class AdminTestService {
                 request.shortDescription().trim(),
                 request.description().trim()
         ));
-        saveQuestions(profession, request.questions());
+        saveQuestions(test, request.questions());
         return toDetails(test);
     }
 
@@ -97,13 +97,13 @@ public class AdminTestService {
                 .orElseThrow(() -> new EntityNotFoundException("Profession not found"));
 
         deleteAttempts(testId);
-        deleteProfessionQuestions(profession.getId());
+        deleteTestQuestions(test.getId());
 
         test.setProfession(profession);
         test.setTitle(request.title().trim());
         test.setShortDescription(request.shortDescription().trim());
         test.setDescription(request.description().trim());
-        saveQuestions(profession, request.questions());
+        saveQuestions(test, request.questions());
         return toDetails(test);
     }
 
@@ -112,6 +112,7 @@ public class AdminTestService {
         InterviewTest test = findTest(testId);
         deleteAttempts(testId);
         favorites.deleteByTestId(testId);
+        deleteTestQuestions(testId);
         tests.delete(test);
     }
 
@@ -120,11 +121,12 @@ public class AdminTestService {
                 .orElseThrow(() -> new EntityNotFoundException("Test not found"));
     }
 
-    private void saveQuestions(Profession profession, List<AdminDtos.QuestionUpsertRequest> requests) {
+    private void saveQuestions(InterviewTest test, List<AdminDtos.QuestionUpsertRequest> requests) {
         for (int index = 0; index < requests.size(); index++) {
             AdminDtos.QuestionUpsertRequest request = requests.get(index);
             Question question = questions.save(new Question(
-                    profession,
+                    test.getProfession(),
+                    test,
                     index + 1,
                     request.type(),
                     request.topic().trim(),
@@ -163,18 +165,10 @@ public class AdminTestService {
         attempts.deleteByTestId(testId);
     }
 
-    private void deleteProfessionQuestions(Long professionId) {
-        List<Long> affectedAttemptIds = attempts.findAll().stream()
-                .filter(attempt -> attempt.getTest().getProfession().getId().equals(professionId))
-                .map(TestAttempt::getId)
-                .toList();
-        if (!affectedAttemptIds.isEmpty()) {
-            answers.deleteByAttemptIdIn(affectedAttemptIds);
-            attemptQuestions.deleteByAttemptIdIn(affectedAttemptIds);
-            affectedAttemptIds.forEach(attempts::deleteById);
-        }
-
-        questions.findByProfessionIdOrderByPosition(professionId).forEach(question -> {
+    private void deleteTestQuestions(Long testId) {
+        questions.findByTestIdOrderByPosition(testId).forEach(question -> {
+            answers.deleteByQuestionId(question.getId());
+            attemptQuestions.deleteByQuestionId(question.getId());
             options.deleteByQuestionId(question.getId());
             pairs.deleteByQuestionId(question.getId());
             questions.delete(question);
@@ -189,7 +183,7 @@ public class AdminTestService {
                 test.getTitle(),
                 test.getShortDescription(),
                 test.getDescription(),
-                questions.findByProfessionIdOrderByPosition(test.getProfession().getId()).stream()
+                questions.findByTestIdOrderByPosition(test.getId()).stream()
                         .map(this::toQuestionDetails)
                         .toList()
         );
@@ -267,4 +261,18 @@ public class AdminTestService {
     private String blankToNull(String value) {
         return trimToNull(value);
     }
+
+    private List<InterviewTest> findTests(String title, String profession) {
+        if (title != null && profession != null) {
+            return tests.searchByTitleAndProfession(title, profession);
+        }
+        if (title != null) {
+            return tests.searchByTitle(title);
+        }
+        if (profession != null) {
+            return tests.searchByProfession(profession);
+        }
+        return tests.findAllWithProfession();
+    }
+
 }

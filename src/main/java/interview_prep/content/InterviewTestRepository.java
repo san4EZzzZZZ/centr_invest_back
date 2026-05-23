@@ -12,9 +12,33 @@ public interface InterviewTestRepository extends JpaRepository<InterviewTest, Lo
     @Query("""
             select test from InterviewTest test
             join fetch test.profession profession
-            where (:title is null or lower(test.title) like lower(concat('%', :title, '%')))
-              and (:profession is null or lower(profession.title) like lower(concat('%', :profession, '%')))
             order by profession.title, test.title
             """)
-    List<InterviewTest> search(@Param("title") String title, @Param("profession") String profession);
+    List<InterviewTest> findAllWithProfession();
+
+    @Query("""
+            select test from InterviewTest test
+            join fetch test.profession profession
+            where lower(test.title) like lower(concat('%', :title, '%'))
+            order by profession.title, test.title
+            """)
+    List<InterviewTest> searchByTitle(@Param("title") String title);
+
+    @Query("""
+            select test from InterviewTest test
+            join fetch test.profession profession
+            where lower(profession.title) like lower(concat('%', :profession, '%'))
+            order by profession.title, test.title
+            """)
+    List<InterviewTest> searchByProfession(@Param("profession") String profession);
+
+    @Query("""
+            select test from InterviewTest test
+            join fetch test.profession profession
+            where lower(test.title) like lower(concat('%', :title, '%'))
+              and lower(profession.title) like lower(concat('%', :profession, '%'))
+            order by profession.title, test.title
+            """)
+    List<InterviewTest> searchByTitleAndProfession(@Param("title") String title,
+                                                   @Param("profession") String profession);
 }
