@@ -78,6 +78,7 @@ public class ProfileController {
                 test.getProfession().getId(),
                 test.getProfession().getTitle(),
                 test.getTitle(),
+                test.getShortDescription(),
                 test.getDescription(),
                 favorite.getCreatedAt()
         );
@@ -88,6 +89,6 @@ public class ProfileController {
     }
 
     public record FavoriteTestResponse(Long testId, Long professionId, String professionTitle, String testTitle,
-                                       String testDescription, Instant addedAt) {
+                                       String testShortDescription, String testDescription, Instant addedAt) {
     }
 }

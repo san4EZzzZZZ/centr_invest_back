@@ -45,6 +45,7 @@ public class DemoDataInitializer implements CommandLineRunner {
         InterviewTest javaBasics = tests.save(new InterviewTest(
                 backend,
                 "Java Backend: базовое собеседование",
+                "Короткая проверка базы Java backend.",
                 "7 вопросов разных типов: один ответ, несколько ответов, соответствие и короткий текст."
         ));
 

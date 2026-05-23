@@ -57,6 +57,14 @@ Authorization: Bearer bearer-token
 
 Returns professions and their tests.
 
+Optional case-insensitive substring search:
+
+```text
+GET /professions?title=java&profession=backend
+```
+
+`title` filters by part of the test title. `profession` filters by part of the profession title.
+
 `GET /tests/{testId}`
 
 Returns full test metadata and questions without correct answers.
@@ -198,6 +206,14 @@ The token must belong to a user with `role = ADMIN`.
 
 Returns all tests with profession info and question counts.
 
+Optional case-insensitive substring search:
+
+```text
+GET /admin/tests?title=java&profession=backend
+```
+
+`title` searches by part of the test title. `profession` searches by part of the profession title.
+
 `GET /admin/tests/{testId}`
 
 Returns test details with correct answers. This endpoint is admin-only because it exposes option `correct` flags and `correctTextAnswer`.
@@ -224,6 +240,7 @@ Create/update request example:
 {
   "professionId": 1,
   "title": "Java Backend: новый тест",
+  "shortDescription": "Короткая проверка Java, HTTP и SQL.",
   "description": "Тест для проверки базовых знаний.",
   "questions": [
     {

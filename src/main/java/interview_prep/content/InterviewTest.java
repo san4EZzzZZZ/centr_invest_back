@@ -26,12 +26,16 @@ public class InterviewTest {
     @Column(nullable = false)
     private String title;
 
+    @Column(nullable = false, length = 300)
+    private String shortDescription;
+
     @Column(nullable = false, length = 800)
     private String description;
 
-    public InterviewTest(Profession profession, String title, String description) {
+    public InterviewTest(Profession profession, String title, String shortDescription, String description) {
         this.profession = profession;
         this.title = title;
+        this.shortDescription = shortDescription;
         this.description = description;
     }
 }

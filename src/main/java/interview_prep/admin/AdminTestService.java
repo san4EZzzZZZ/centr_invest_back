@@ -51,13 +51,16 @@ public class AdminTestService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminDtos.TestSummaryResponse> list() {
-        return tests.findAll().stream()
+    public List<AdminDtos.TestSummaryResponse> list(String title, String profession) {
+        String titleFilter = blankToNull(title);
+        String professionFilter = blankToNull(profession);
+        return tests.search(titleFilter, professionFilter).stream()
                 .map(test -> new AdminDtos.TestSummaryResponse(
                         test.getId(),
                         test.getProfession().getId(),
                         test.getProfession().getTitle(),
                         test.getTitle(),
+                        test.getShortDescription(),
                         test.getDescription(),
                         (int) questions.countByProfessionId(test.getProfession().getId())
                 ))
@@ -76,7 +79,12 @@ public class AdminTestService {
         Profession profession = professions.findById(request.professionId())
                 .orElseThrow(() -> new EntityNotFoundException("Profession not found"));
 
-        InterviewTest test = tests.save(new InterviewTest(profession, request.title().trim(), request.description().trim()));
+        InterviewTest test = tests.save(new InterviewTest(
+                profession,
+                request.title().trim(),
+                request.shortDescription().trim(),
+                request.description().trim()
+        ));
         saveQuestions(profession, request.questions());
         return toDetails(test);
     }
@@ -93,6 +101,7 @@ public class AdminTestService {
 
         test.setProfession(profession);
         test.setTitle(request.title().trim());
+        test.setShortDescription(request.shortDescription().trim());
         test.setDescription(request.description().trim());
         saveQuestions(profession, request.questions());
         return toDetails(test);
@@ -178,6 +187,7 @@ public class AdminTestService {
                 test.getProfession().getId(),
                 test.getProfession().getTitle(),
                 test.getTitle(),
+                test.getShortDescription(),
                 test.getDescription(),
                 questions.findByProfessionIdOrderByPosition(test.getProfession().getId()).stream()
                         .map(this::toQuestionDetails)
@@ -252,5 +262,9 @@ public class AdminTestService {
             return null;
         }
         return value.trim();
+    }
+
+    private String blankToNull(String value) {
+        return trimToNull(value);
     }
 }

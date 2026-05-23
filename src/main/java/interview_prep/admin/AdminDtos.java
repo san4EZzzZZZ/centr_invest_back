@@ -11,6 +11,7 @@ public class AdminDtos {
     public record TestUpsertRequest(
             @NotNull Long professionId,
             @NotBlank String title,
+            @NotBlank String shortDescription,
             @NotBlank String description,
             @Valid List<QuestionUpsertRequest> questions
     ) {
@@ -39,6 +40,7 @@ public class AdminDtos {
             Long professionId,
             String professionTitle,
             String title,
+            String shortDescription,
             String description,
             int questionCount
     ) {
@@ -49,6 +51,7 @@ public class AdminDtos {
             Long professionId,
             String professionTitle,
             String title,
+            String shortDescription,
             String description,
             List<QuestionDetailsResponse> questions
     ) {
