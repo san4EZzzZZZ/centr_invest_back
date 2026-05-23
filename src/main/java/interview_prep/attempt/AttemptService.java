@@ -36,10 +36,12 @@ public class AttemptService {
     private final AttemptAnswerRepository answers;
     private final AttemptQuestionRepository attemptQuestions;
     private final ContentMapper mapper;
+    private final ShortTextAnswerReviewService shortTextAnswerReviewService;
 
     public AttemptService(InterviewTestRepository tests, QuestionRepository questions, QuestionOptionRepository options,
                           MatchPairRepository pairs, TestAttemptRepository attempts, AttemptAnswerRepository answers,
-                          AttemptQuestionRepository attemptQuestions, ContentMapper mapper) {
+                          AttemptQuestionRepository attemptQuestions, ContentMapper mapper,
+                          ShortTextAnswerReviewService shortTextAnswerReviewService) {
         this.tests = tests;
         this.questions = questions;
         this.options = options;
@@ -48,6 +50,7 @@ public class AttemptService {
         this.answers = answers;
         this.attemptQuestions = attemptQuestions;
         this.mapper = mapper;
+        this.shortTextAnswerReviewService = shortTextAnswerReviewService;
     }
 
     @Transactional
@@ -95,8 +98,17 @@ public class AttemptService {
             throw new IllegalArgumentException("Question is already answered");
         }
 
-        boolean correct = isCorrect(question, request);
-        answers.save(new AttemptAnswer(attempt, question, correct, submittedAnswer(request)));
+        AnswerCheck answerCheck = checkAnswer(question, request);
+        boolean correct = answerCheck.correct();
+        answers.save(new AttemptAnswer(
+                attempt,
+                question,
+                correct,
+                submittedAnswer(request),
+                answerCheck.checkedByAi(),
+                answerCheck.aiConfidence(),
+                answerCheck.aiReason()
+        ));
         if (correct) {
             attempt.setCorrectAnswers(attempt.getCorrectAnswers() + 1);
         }
@@ -116,6 +128,9 @@ public class AttemptService {
                 correct,
                 question.getExplanation(),
                 question.getReadMoreUrl(),
+                answerCheck.checkedByAi(),
+                answerCheck.aiConfidence(),
+                answerCheck.aiReason(),
                 nextQuestion == null ? null : mapper.toQuestionResponse(nextQuestion),
                 result
         );
@@ -177,7 +192,7 @@ public class AttemptService {
         return pool.stream().limit(limit).toList();
     }
 
-    private boolean isCorrect(Question question, AnswerRequest request) {
+    private AnswerCheck checkAnswer(Question question, AnswerRequest request) {
         if (question.getType() == QuestionType.SINGLE_CHOICE || question.getType() == QuestionType.MULTIPLE_CHOICE) {
             Set<Long> expected = options.findByQuestionIdOrderById(question.getId()).stream()
                     .filter(QuestionOption::isCorrect)
@@ -186,14 +201,21 @@ public class AttemptService {
             Set<Long> actual = request.selectedOptionIds() == null
                     ? Set.of()
                     : new HashSet<>(request.selectedOptionIds());
-            return expected.equals(actual);
+            return AnswerCheck.strict(expected.equals(actual));
         }
         if (question.getType() == QuestionType.MATCHING) {
             Map<String, String> expected = pairs.findByQuestionIdOrderById(question.getId()).stream()
                     .collect(Collectors.toMap(pair -> pair.getLeftLabel(), pair -> pair.getRightLabel()));
-            return expected.equals(request.matches() == null ? Map.of() : request.matches());
+            return AnswerCheck.strict(expected.equals(request.matches() == null ? Map.of() : request.matches()));
         }
-        return normalize(question.getCorrectTextAnswer()).equals(normalize(request.textAnswer()));
+        ShortTextAnswerReviewService.Evaluation evaluation =
+                shortTextAnswerReviewService.evaluate(question, request.textAnswer());
+        return new AnswerCheck(
+                evaluation.correct(),
+                evaluation.checkedByAi(),
+                evaluation.confidence(),
+                evaluation.reason()
+        );
     }
 
     private AttemptDtos.ResultResponse result(TestAttempt attempt) {
@@ -232,5 +254,11 @@ public class AttemptService {
         }
         return Normalizer.normalize(value.trim().toLowerCase(), Normalizer.Form.NFKC)
                 .replaceAll("\\s+", " ");
+    }
+
+    private record AnswerCheck(boolean correct, boolean checkedByAi, Double aiConfidence, String aiReason) {
+        private static AnswerCheck strict(boolean correct) {
+            return new AnswerCheck(correct, false, null, null);
+        }
     }
 }

@@ -130,7 +130,24 @@ Short text:
 }
 ```
 
-Answer response includes `correct`, `explanation`, `readMoreUrl`, and either `nextQuestion` or final `result`.
+Answer response includes `correct`, `explanation`, `readMoreUrl`, AI short-text check fields, and either `nextQuestion` or final `result`.
+
+For `SHORT_TEXT`, the backend first uses strict normalized comparison. If it does not match and AI is configured, the backend asks the model whether the submitted answer is semantically equivalent to the expected answer.
+
+Example answer response fragment:
+
+```json
+{
+  "correct": true,
+  "explanation": "Для наследования класса используется extends.",
+  "readMoreUrl": "https://docs.oracle.com/javase/tutorial/java/IandI/subclasses.html",
+  "checkedByAi": true,
+  "aiConfidence": 0.91,
+  "aiReason": "Student answer has the same meaning as the expected answer.",
+  "nextQuestion": null,
+  "result": null
+}
+```
 
 `GET /attempts/{attemptId}/result`
 
@@ -140,7 +157,7 @@ Returns final score, weak topics, and recommendation. Available after completion
 
 Returns a final personalized review based on the user's answers. Available after completion.
 
-If `OPENAI_API_KEY` is configured, the backend asks the model to generate a concise Russian review. If the key is missing or the provider call fails, the backend returns a deterministic fallback review from stored explanations and resource URLs.
+If `AI_API_KEY` and `AI_MODEL` are configured, the backend asks the model to generate a concise Russian review. If the key is missing or the provider call fails, the backend returns a deterministic fallback review from stored explanations and resource URLs.
 
 Example response:
 
@@ -170,8 +187,11 @@ Example response:
 Environment variables:
 
 ```text
-OPENAI_API_KEY=your_api_key
-OPENAI_MODEL=gpt-4.1-mini
+AI_BASE_URL=https://integrate.api.nvidia.com/v1
+AI_API_KEY=your_api_key
+AI_MODEL=meta/llama-3.1-70b-instruct
+AI_ANSWER_CHECK_ENABLED=true
+AI_ANSWER_CHECK_MIN_CONFIDENCE=0.75
 ```
 
 ## Profile

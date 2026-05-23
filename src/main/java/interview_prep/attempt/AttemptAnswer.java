@@ -38,6 +38,14 @@ public class AttemptAnswer {
     private String submittedAnswer;
 
     @Column(nullable = false)
+    private boolean checkedByAi;
+
+    private Double aiConfidence;
+
+    @Lob
+    private String aiReason;
+
+    @Column(nullable = false)
     private Instant answeredAt = Instant.now();
 
     public AttemptAnswer(TestAttempt attempt, Question question, boolean correct, String submittedAnswer) {
@@ -45,5 +53,13 @@ public class AttemptAnswer {
         this.question = question;
         this.correct = correct;
         this.submittedAnswer = submittedAnswer;
+    }
+
+    public AttemptAnswer(TestAttempt attempt, Question question, boolean correct, String submittedAnswer,
+                         boolean checkedByAi, Double aiConfidence, String aiReason) {
+        this(attempt, question, correct, submittedAnswer);
+        this.checkedByAi = checkedByAi;
+        this.aiConfidence = aiConfidence;
+        this.aiReason = aiReason;
     }
 }

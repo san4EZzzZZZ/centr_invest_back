@@ -26,14 +26,15 @@ public class AiReviewService {
 
     public AiReviewService(TestAttemptRepository attempts,
                            AttemptAnswerRepository answers,
+                           @Value("${app.ai.openai.base-url}") String baseUrl,
                            @Value("${app.ai.openai.api-key:}") String openAiApiKey,
-                           @Value("${app.ai.openai.model:gpt-4.1-mini}") String model) {
+                           @Value("${app.ai.openai.model:}") String model) {
         this.attempts = attempts;
         this.answers = answers;
         this.openAiApiKey = openAiApiKey;
         this.model = model;
         this.restClient = RestClient.builder()
-                .baseUrl("https://api.openai.com/v1")
+                .baseUrl(baseUrl)
                 .build();
     }
 
@@ -43,7 +44,7 @@ public class AiReviewService {
         List<AttemptAnswer> attemptAnswers = answers.findByAttemptIdOrderByQuestionPosition(attemptId);
         ReviewContext context = buildContext(attempt, attemptAnswers);
 
-        if (openAiApiKey == null || openAiApiKey.isBlank()) {
+        if (openAiApiKey == null || openAiApiKey.isBlank() || model == null || model.isBlank()) {
             return fallbackReview(attemptId, context);
         }
 
@@ -112,20 +113,30 @@ public class AiReviewService {
     private String callOpenAi(ReviewContext context) {
         Map<String, Object> body = Map.of(
                 "model", model,
-                "input", prompt(context),
-                "max_output_tokens", 900
+                "temperature", 0.2,
+                "max_tokens", 900,
+                "messages", List.of(
+                        Map.of(
+                                "role", "system",
+                                "content", "You are an interview preparation mentor. Return concise practical feedback in Russian."
+                        ),
+                        Map.of(
+                                "role", "user",
+                                "content", prompt(context)
+                        )
+                )
         );
 
         @SuppressWarnings("unchecked")
         Map<String, Object> response = restClient.post()
-                .uri("/responses")
+                .uri("/chat/completions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + openAiApiKey)
                 .body(body)
                 .retrieve()
                 .body(Map.class);
 
-        return extractOutputText(response);
+        return extractChatCompletionText(response);
     }
 
     private String prompt(ReviewContext context) {
@@ -191,6 +202,26 @@ public class AiReviewService {
             }
         }
         return builder.toString().trim();
+    }
+
+    private String extractChatCompletionText(Map<String, Object> response) {
+        if (response == null) {
+            return "";
+        }
+        Object choices = response.get("choices");
+        if (!(choices instanceof List<?> choiceItems) || choiceItems.isEmpty()) {
+            return extractOutputText(response);
+        }
+        Object firstChoice = choiceItems.getFirst();
+        if (!(firstChoice instanceof Map<?, ?> choiceMap)) {
+            return "";
+        }
+        Object message = choiceMap.get("message");
+        if (!(message instanceof Map<?, ?> messageMap)) {
+            return "";
+        }
+        Object content = messageMap.get("content");
+        return content instanceof String text ? text.trim() : "";
     }
 
     private AttemptDtos.AiReviewResponse fromGeneratedText(Long attemptId, ReviewContext context, String generated) {

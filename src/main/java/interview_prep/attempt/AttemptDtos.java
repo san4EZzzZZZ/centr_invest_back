@@ -22,6 +22,9 @@ public class AttemptDtos {
             boolean correct,
             String explanation,
             String readMoreUrl,
+            boolean checkedByAi,
+            Double aiConfidence,
+            String aiReason,
             ContentDtos.QuestionResponse nextQuestion,
             ResultResponse result
     ) {
