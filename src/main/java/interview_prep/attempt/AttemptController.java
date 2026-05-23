@@ -11,9 +11,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api")
 public class AttemptController {
     private final AttemptService attemptService;
+    private final AiReviewService aiReviewService;
 
-    public AttemptController(AttemptService attemptService) {
+    public AttemptController(AttemptService attemptService, AiReviewService aiReviewService) {
         this.attemptService = attemptService;
+        this.aiReviewService = aiReviewService;
     }
 
     @PostMapping("/tests/{testId}/attempts")
@@ -34,5 +36,10 @@ public class AttemptController {
     @GetMapping("/attempts/{attemptId}/result")
     public AttemptDtos.ResultResponse result(@PathVariable Long attemptId) {
         return attemptService.result(attemptId);
+    }
+
+    @GetMapping("/attempts/{attemptId}/ai-review")
+    public AttemptDtos.AiReviewResponse aiReview(@PathVariable Long attemptId) {
+        return aiReviewService.review(attemptId);
     }
 }

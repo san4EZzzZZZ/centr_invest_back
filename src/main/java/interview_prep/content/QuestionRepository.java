@@ -6,9 +6,11 @@ import java.util.List;
 import java.util.Optional;
 
 public interface QuestionRepository extends JpaRepository<Question, Long> {
-    List<Question> findByTestIdOrderByPosition(Long testId);
+    List<Question> findByProfessionIdOrderByPosition(Long professionId);
 
-    long countByTestId(Long testId);
+    List<Question> findByProfessionIdAndTypeOrderByPosition(Long professionId, QuestionType type);
 
-    Optional<Question> findFirstByTestIdAndPosition(Long testId, int position);
+    long countByProfessionId(Long professionId);
+
+    Optional<Question> findFirstByProfessionIdAndPosition(Long professionId, int position);
 }

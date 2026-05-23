@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.text.Normalizer;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,17 +34,19 @@ public class AttemptService {
     private final MatchPairRepository pairs;
     private final TestAttemptRepository attempts;
     private final AttemptAnswerRepository answers;
+    private final AttemptQuestionRepository attemptQuestions;
     private final ContentMapper mapper;
 
     public AttemptService(InterviewTestRepository tests, QuestionRepository questions, QuestionOptionRepository options,
                           MatchPairRepository pairs, TestAttemptRepository attempts, AttemptAnswerRepository answers,
-                          ContentMapper mapper) {
+                          AttemptQuestionRepository attemptQuestions, ContentMapper mapper) {
         this.tests = tests;
         this.questions = questions;
         this.options = options;
         this.pairs = pairs;
         this.attempts = attempts;
         this.answers = answers;
+        this.attemptQuestions = attemptQuestions;
         this.mapper = mapper;
     }
 
@@ -51,13 +55,16 @@ public class AttemptService {
         UserAccount user = CurrentUserContext.getRequired();
         InterviewTest test = tests.findById(testId)
                 .orElseThrow(() -> new EntityNotFoundException("Test not found"));
-        int totalQuestions = (int) questions.countByTestId(testId);
-        if (totalQuestions == 0) {
-            throw new IllegalArgumentException("Test has no questions");
+        List<Question> selectedQuestions = composeQuestions(test);
+        if (selectedQuestions.isEmpty()) {
+            throw new IllegalArgumentException("Question pool is empty for this profession");
         }
 
-        TestAttempt attempt = attempts.save(new TestAttempt(user, test, totalQuestions));
-        Question first = questionAt(testId, 1);
+        TestAttempt attempt = attempts.save(new TestAttempt(user, test, selectedQuestions.size()));
+        for (int index = 0; index < selectedQuestions.size(); index++) {
+            attemptQuestions.save(new AttemptQuestion(attempt, selectedQuestions.get(index), index + 1));
+        }
+        Question first = questionAt(attempt.getId(), 1);
         return new AttemptDtos.StartAttemptResponse(attempt.getId(), mapper.toQuestionResponse(first));
     }
 
@@ -66,7 +73,7 @@ public class AttemptService {
         TestAttempt attempt = ownedAttempt(attemptId);
         Question question = attempt.getStatus() == AttemptStatus.COMPLETED
                 ? null
-                : questionAt(attempt.getTest().getId(), attempt.getCurrentPosition());
+                : questionAt(attempt.getId(), attempt.getCurrentPosition());
         return new AttemptDtos.AttemptStateResponse(
                 attempt.getId(),
                 attempt.getStatus(),
@@ -83,7 +90,7 @@ public class AttemptService {
             throw new IllegalArgumentException("Attempt is already completed");
         }
 
-        Question question = questionAt(attempt.getTest().getId(), attempt.getCurrentPosition());
+        Question question = questionAt(attempt.getId(), attempt.getCurrentPosition());
         if (answers.existsByAttemptIdAndQuestionId(attemptId, question.getId())) {
             throw new IllegalArgumentException("Question is already answered");
         }
@@ -102,7 +109,7 @@ public class AttemptService {
             result = result(attempt);
         } else {
             attempt.setCurrentPosition(attempt.getCurrentPosition() + 1);
-            nextQuestion = questionAt(attempt.getTest().getId(), attempt.getCurrentPosition());
+            nextQuestion = questionAt(attempt.getId(), attempt.getCurrentPosition());
         }
 
         return new AttemptDtos.AnswerResponse(
@@ -147,9 +154,27 @@ public class AttemptService {
         return attempt;
     }
 
-    private Question questionAt(Long testId, int position) {
-        return questions.findFirstByTestIdAndPosition(testId, position)
+    private Question questionAt(Long attemptId, int position) {
+        return attemptQuestions.findByAttemptIdAndPosition(attemptId, position)
+                .map(AttemptQuestion::getQuestion)
                 .orElseThrow(() -> new EntityNotFoundException("Question not found"));
+    }
+
+    private List<Question> composeQuestions(InterviewTest test) {
+        Long professionId = test.getProfession().getId();
+        List<Question> selected = new ArrayList<>();
+        selected.addAll(takeRandom(professionId, QuestionType.SINGLE_CHOICE, 2));
+        selected.addAll(takeRandom(professionId, QuestionType.MULTIPLE_CHOICE, 2));
+        selected.addAll(takeRandom(professionId, QuestionType.MATCHING, 1));
+        selected.addAll(takeRandom(professionId, QuestionType.SHORT_TEXT, 2));
+        Collections.shuffle(selected);
+        return selected;
+    }
+
+    private List<Question> takeRandom(Long professionId, QuestionType type, int limit) {
+        List<Question> pool = new ArrayList<>(questions.findByProfessionIdAndTypeOrderByPosition(professionId, type));
+        Collections.shuffle(pool);
+        return pool.stream().limit(limit).toList();
     }
 
     private boolean isCorrect(Question question, AnswerRequest request) {

@@ -1,6 +1,7 @@
 package interview_prep.admin;
 
 import interview_prep.attempt.AttemptAnswerRepository;
+import interview_prep.attempt.AttemptQuestionRepository;
 import interview_prep.attempt.TestAttempt;
 import interview_prep.attempt.TestAttemptRepository;
 import interview_prep.content.InterviewTest;
@@ -14,6 +15,7 @@ import interview_prep.content.QuestionOption;
 import interview_prep.content.QuestionOptionRepository;
 import interview_prep.content.QuestionRepository;
 import interview_prep.content.QuestionType;
+import interview_prep.profile.FavoriteTestRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,11 +31,14 @@ public class AdminTestService {
     private final MatchPairRepository pairs;
     private final TestAttemptRepository attempts;
     private final AttemptAnswerRepository answers;
+    private final AttemptQuestionRepository attemptQuestions;
+    private final FavoriteTestRepository favorites;
 
     public AdminTestService(ProfessionRepository professions, InterviewTestRepository tests,
                             QuestionRepository questions, QuestionOptionRepository options,
                             MatchPairRepository pairs, TestAttemptRepository attempts,
-                            AttemptAnswerRepository answers) {
+                            AttemptAnswerRepository answers, AttemptQuestionRepository attemptQuestions,
+                            FavoriteTestRepository favorites) {
         this.professions = professions;
         this.tests = tests;
         this.questions = questions;
@@ -41,6 +46,8 @@ public class AdminTestService {
         this.pairs = pairs;
         this.attempts = attempts;
         this.answers = answers;
+        this.attemptQuestions = attemptQuestions;
+        this.favorites = favorites;
     }
 
     @Transactional(readOnly = true)
@@ -52,7 +59,7 @@ public class AdminTestService {
                         test.getProfession().getTitle(),
                         test.getTitle(),
                         test.getDescription(),
-                        (int) questions.countByTestId(test.getId())
+                        (int) questions.countByProfessionId(test.getProfession().getId())
                 ))
                 .toList();
     }
@@ -70,7 +77,7 @@ public class AdminTestService {
                 .orElseThrow(() -> new EntityNotFoundException("Profession not found"));
 
         InterviewTest test = tests.save(new InterviewTest(profession, request.title().trim(), request.description().trim()));
-        saveQuestions(test, request.questions());
+        saveQuestions(profession, request.questions());
         return toDetails(test);
     }
 
@@ -82,12 +89,12 @@ public class AdminTestService {
                 .orElseThrow(() -> new EntityNotFoundException("Profession not found"));
 
         deleteAttempts(testId);
-        deleteQuestions(testId);
+        deleteProfessionQuestions(profession.getId());
 
         test.setProfession(profession);
         test.setTitle(request.title().trim());
         test.setDescription(request.description().trim());
-        saveQuestions(test, request.questions());
+        saveQuestions(profession, request.questions());
         return toDetails(test);
     }
 
@@ -95,7 +102,7 @@ public class AdminTestService {
     public void delete(Long testId) {
         InterviewTest test = findTest(testId);
         deleteAttempts(testId);
-        deleteQuestions(testId);
+        favorites.deleteByTestId(testId);
         tests.delete(test);
     }
 
@@ -104,11 +111,11 @@ public class AdminTestService {
                 .orElseThrow(() -> new EntityNotFoundException("Test not found"));
     }
 
-    private void saveQuestions(InterviewTest test, List<AdminDtos.QuestionUpsertRequest> requests) {
+    private void saveQuestions(Profession profession, List<AdminDtos.QuestionUpsertRequest> requests) {
         for (int index = 0; index < requests.size(); index++) {
             AdminDtos.QuestionUpsertRequest request = requests.get(index);
             Question question = questions.save(new Question(
-                    test,
+                    profession,
                     index + 1,
                     request.type(),
                     request.topic().trim(),
@@ -142,12 +149,23 @@ public class AdminTestService {
                 .toList();
         if (!attemptIds.isEmpty()) {
             answers.deleteByAttemptIdIn(attemptIds);
+            attemptQuestions.deleteByAttemptIdIn(attemptIds);
         }
         attempts.deleteByTestId(testId);
     }
 
-    private void deleteQuestions(Long testId) {
-        questions.findByTestIdOrderByPosition(testId).forEach(question -> {
+    private void deleteProfessionQuestions(Long professionId) {
+        List<Long> affectedAttemptIds = attempts.findAll().stream()
+                .filter(attempt -> attempt.getTest().getProfession().getId().equals(professionId))
+                .map(TestAttempt::getId)
+                .toList();
+        if (!affectedAttemptIds.isEmpty()) {
+            answers.deleteByAttemptIdIn(affectedAttemptIds);
+            attemptQuestions.deleteByAttemptIdIn(affectedAttemptIds);
+            affectedAttemptIds.forEach(attempts::deleteById);
+        }
+
+        questions.findByProfessionIdOrderByPosition(professionId).forEach(question -> {
             options.deleteByQuestionId(question.getId());
             pairs.deleteByQuestionId(question.getId());
             questions.delete(question);
@@ -161,7 +179,7 @@ public class AdminTestService {
                 test.getProfession().getTitle(),
                 test.getTitle(),
                 test.getDescription(),
-                questions.findByTestIdOrderByPosition(test.getId()).stream()
+                questions.findByProfessionIdOrderByPosition(test.getProfession().getId()).stream()
                         .map(this::toQuestionDetails)
                         .toList()
         );

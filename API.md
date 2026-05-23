@@ -61,6 +61,17 @@ Returns professions and their tests.
 
 Returns full test metadata and questions without correct answers.
 
+Important: tests are now generated from a profession question pool. A test is not a fixed list of questions. When a user starts an attempt, the backend selects questions from the test profession pool:
+
+```text
+up to 2 SINGLE_CHOICE
+up to 2 MULTIPLE_CHOICE
+up to 1 MATCHING
+up to 2 SHORT_TEXT
+```
+
+If the pool does not contain enough questions of a required type, the backend takes all available questions of that type.
+
 Question types:
 
 ```text
@@ -76,7 +87,7 @@ For `MATCHING`, the question contains `matchLeftItems` and `matchRightItems`; su
 
 `POST /tests/{testId}/attempts`
 
-Starts a new attempt and returns the first question.
+Starts a new attempt, composes a concrete question set from the profession pool, stores it for this attempt, and returns the first question.
 
 `GET /attempts/{attemptId}`
 
@@ -117,11 +128,61 @@ Answer response includes `correct`, `explanation`, `readMoreUrl`, and either `ne
 
 Returns final score, weak topics, and recommendation. Available after completion.
 
+`GET /attempts/{attemptId}/ai-review`
+
+Returns a final personalized review based on the user's answers. Available after completion.
+
+If `OPENAI_API_KEY` is configured, the backend asks the model to generate a concise Russian review. If the key is missing or the provider call fails, the backend returns a deterministic fallback review from stored explanations and resource URLs.
+
+Example response:
+
+```json
+{
+  "attemptId": 1,
+  "generatedByAi": false,
+  "summary": "Есть пробелы в темах: REST, SQL. Ниже собраны рекомендации и ссылки для повторения.",
+  "topics": [
+    {
+      "topic": "REST",
+      "diagnosis": "Ошибки или точки для повторения связаны с вопросами по этой теме.",
+      "recommendation": "Разбери пояснение к вопросу и прочитай ресурс из блока resources."
+    }
+  ],
+  "resources": [
+    {
+      "title": "REST",
+      "url": "https://restfulapi.net/",
+      "reason": "Материал поможет повторить тему REST"
+    }
+  ],
+  "nextStep": "Начни с первой слабой темы, прочитай материал по ссылке и затем повтори вопросы по этой теме."
+}
+```
+
+Environment variables:
+
+```text
+OPENAI_API_KEY=your_api_key
+OPENAI_MODEL=gpt-4.1-mini
+```
+
 ## Profile
 
 `GET /profile`
 
-Returns the current user and 5 latest completed attempts.
+Returns the current user, 5 latest completed attempts, and favorite tests.
+
+`GET /profile/favorites`
+
+Returns only favorite tests.
+
+`POST /profile/favorites/tests/{testId}`
+
+Adds a test to favorites.
+
+`DELETE /profile/favorites/tests/{testId}`
+
+Removes a test from favorites.
 
 ## Admin Tests
 
@@ -145,9 +206,13 @@ Returns test details with correct answers. This endpoint is admin-only because i
 
 Creates a test with questions.
 
+The questions from this request are added to the selected profession question pool. Attempts generated for tests of that profession will use this pool.
+
 `PUT /admin/tests/{testId}`
 
 Fully replaces test metadata and questions. Existing attempts for this test are deleted because old answers would no longer match the new question set.
+
+In the current prototype, update also replaces the profession question pool provided in the request.
 
 `DELETE /admin/tests/{testId}`
 

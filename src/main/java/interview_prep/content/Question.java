@@ -24,7 +24,7 @@ public class Question {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    private InterviewTest test;
+    private Profession profession;
 
     @Column(nullable = false)
     private int position;
@@ -49,9 +49,9 @@ public class Question {
     @Column(nullable = false)
     private String readMoreUrl;
 
-    public Question(InterviewTest test, int position, QuestionType type, String topic, String prompt,
+    public Question(Profession profession, int position, QuestionType type, String topic, String prompt,
                     String correctTextAnswer, String explanation, String readMoreUrl) {
-        this.test = test;
+        this.profession = profession;
         this.position = position;
         this.type = type;
         this.topic = topic;

@@ -36,7 +36,7 @@ public class ContentController {
                                         test.getId(),
                                         test.getTitle(),
                                         test.getDescription(),
-                                        (int) questions.countByTestId(test.getId())
+                                        (int) questions.countByProfessionId(profession.getId())
                                 ))
                                 .toList()
                 ))
@@ -52,7 +52,7 @@ public class ContentController {
                 test.getProfession().getId(),
                 test.getTitle(),
                 test.getDescription(),
-                questions.findByTestIdOrderByPosition(testId).stream()
+                questions.findByProfessionIdOrderByPosition(test.getProfession().getId()).stream()
                         .map(mapper::toQuestionResponse)
                         .toList()
         );

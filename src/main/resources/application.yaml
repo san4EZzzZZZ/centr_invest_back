@@ -22,3 +22,9 @@ logging:
   level:
     root: INFO
     org.hibernate.SQL: WARN
+
+app:
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: ${OPENAI_MODEL:gpt-4.1-mini}

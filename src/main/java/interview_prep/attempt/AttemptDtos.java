@@ -47,4 +47,28 @@ public class AttemptDtos {
             Instant completedAt
     ) {
     }
+
+    public record AiReviewResponse(
+            Long attemptId,
+            boolean generatedByAi,
+            String summary,
+            List<AiTopicReview> topics,
+            List<AiResource> resources,
+            String nextStep
+    ) {
+    }
+
+    public record AiTopicReview(
+            String topic,
+            String diagnosis,
+            String recommendation
+    ) {
+    }
+
+    public record AiResource(
+            String title,
+            String url,
+            String reason
+    ) {
+    }
 }
