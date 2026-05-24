@@ -16,6 +16,6 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /home/${{ secrets.SERVER_USER }}/centr_invest_back
+            cd /root/centr_invest_back
             git pull origin main
             docker compose up -d --build backend
