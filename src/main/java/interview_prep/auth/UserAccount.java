@@ -33,6 +33,9 @@ public class UserAccount {
     @Column(nullable = false)
     private String passwordHash;
 
+    @Column
+    private String avatarPath;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserRole role = UserRole.USER;

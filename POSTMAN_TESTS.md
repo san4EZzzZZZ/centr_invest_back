@@ -9,6 +9,8 @@
 ```text
 baseUrl = http://localhost:8080/api
 token =
+email =
+verificationCode =
 testId =
 attemptId =
 optionGetId =
@@ -26,7 +28,7 @@ optionStatelessId =
 Authorization: Bearer {{token}}
 ```
 
-## 1. Register
+## 1. Request Registration Code
 
 `POST {{baseUrl}}/auth/register`
 
@@ -49,19 +51,50 @@ Body:
 Tests:
 
 ```javascript
-pm.test("register returns 200", function () {
+pm.test("registration code request returns 200", function () {
   pm.response.to.have.status(200);
 });
 
 const json = pm.response.json();
 
-pm.test("token exists", function () {
-  pm.expect(json.token).to.be.a("string").and.not.empty;
+pm.test("expiresAt exists", function () {
+  pm.expect(json.expiresAt).to.be.a("string");
 });
 
-pm.test("user exists", function () {
-  pm.expect(json.user.email).to.include("@example.com");
+const requestBody = JSON.parse(pm.request.body.raw);
+pm.environment.set("email", requestBody.email);
+```
+
+Если `MAIL_HOST` не задан, код появится в логе backend как `Email code for ...`.
+Скопируй его в переменную окружения `verificationCode`.
+
+## 1.1 Confirm Registration
+
+`POST {{baseUrl}}/auth/register/confirm`
+
+Headers:
+
+```text
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{
+  "email": "{{email}}",
+  "code": "{{verificationCode}}"
+}
+```
+
+Tests:
+
+```javascript
+pm.test("registration confirmation returns 200", function () {
+  pm.response.to.have.status(200);
 });
+
+const json = pm.response.json();
 
 pm.environment.set("token", json.token);
 ```

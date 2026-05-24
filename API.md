@@ -22,6 +22,27 @@ role: ADMIN
 }
 ```
 
+Creates a pending registration and sends a confirmation code to email. The user is not created yet.
+
+Response:
+
+```json
+{
+  "expiresAt": "2026-06-04T20:40:00Z"
+}
+```
+
+`POST /auth/register/confirm`
+
+```json
+{
+  "email": "student@example.com",
+  "code": "123456"
+}
+```
+
+Creates the user and returns an auth session.
+
 `POST /auth/login`
 
 ```json
@@ -31,7 +52,7 @@ role: ADMIN
 }
 ```
 
-Both endpoints return:
+Login and registration confirmation return:
 
 ```json
 {
@@ -40,7 +61,9 @@ Both endpoints return:
   "user": {
     "id": 1,
     "email": "student@example.com",
-    "username": "Student"
+    "username": "Student",
+    "role": "USER",
+    "avatarUrl": null
   }
 }
 ```
@@ -50,6 +73,28 @@ Send protected requests with:
 ```text
 Authorization: Bearer bearer-token
 ```
+
+`POST /auth/password/forgot`
+
+```json
+{
+  "email": "student@example.com"
+}
+```
+
+Sends a password reset code if the user exists.
+
+`POST /auth/password/reset`
+
+```json
+{
+  "email": "student@example.com",
+  "code": "123456",
+  "newPassword": "newSecret123"
+}
+```
+
+Updates password and deletes existing sessions for this user.
 
 ## Content
 
@@ -202,6 +247,13 @@ Example response:
 Environment variables:
 
 ```text
+MAIL_HOST=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=your_smtp_username
+MAIL_PASSWORD=your_smtp_password
+MAIL_FROM=no-reply@example.com
+MAIL_CODE_TTL=10m
+AVATARS_DIR=uploads/avatars
 AI_BASE_URL=https://integrate.api.nvidia.com/v1
 AI_API_KEY=your_api_key
 AI_MODEL=meta/llama-3.1-70b-instruct
@@ -216,6 +268,82 @@ AI_ANSWER_CHECK_MIN_CONFIDENCE=0.75
 `GET /profile`
 
 Returns the current user, 5 latest completed attempts, and favorite tests.
+
+Current user includes `avatarUrl`:
+
+```json
+{
+  "id": 1,
+  "email": "student@example.com",
+  "username": "Student",
+  "role": "USER",
+  "avatarUrl": "/api/profile/avatar/uuid.png"
+}
+```
+
+`PATCH /profile/name`
+
+```json
+{
+  "username": "New Name"
+}
+```
+
+Updates username without email confirmation.
+
+`POST /profile/email/change/request`
+
+```json
+{
+  "newEmail": "new-email@example.com"
+}
+```
+
+Sends a confirmation code to the new email.
+
+`POST /profile/email/change/confirm`
+
+```json
+{
+  "newEmail": "new-email@example.com",
+  "code": "123456"
+}
+```
+
+Updates account email.
+
+`POST /profile/password/change/request`
+
+Sends a password change code to the current account email.
+
+`POST /profile/password/change/confirm`
+
+```json
+{
+  "code": "123456",
+  "newPassword": "newSecret123"
+}
+```
+
+Updates password and deletes existing sessions.
+
+`POST /profile/avatar`
+
+Multipart form-data:
+
+```text
+file = avatar image
+```
+
+Accepted types: `image/jpeg`, `image/png`, `image/webp`. Files are stored locally in `uploads/avatars` by default.
+
+`DELETE /profile/avatar`
+
+Deletes current avatar.
+
+`GET /profile/avatar/{fileName}`
+
+Returns avatar image by `avatarUrl`.
 
 `GET /profile/favorites`
 

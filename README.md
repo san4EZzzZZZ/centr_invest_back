@@ -81,6 +81,24 @@ $env:DB_PASSWORD="interview_prep"
 .\mvnw.cmd spring-boot:run
 ```
 
+SMTP для отправки кодов:
+
+```powershell
+$env:MAIL_HOST="smtp.example.com"
+$env:MAIL_PORT="587"
+$env:MAIL_USERNAME="your_smtp_username"
+$env:MAIL_PASSWORD="your_smtp_password"
+$env:MAIL_FROM="no-reply@example.com"
+```
+
+Если `MAIL_HOST` не задан, сервер не падает: код подтверждения пишется в лог приложения. Это удобно для локальной разработки и Postman-проверок.
+
+Аватарки хранятся локально:
+
+```text
+AVATARS_DIR=uploads/avatars
+```
+
 Таблицы пока создаются автоматически через Hibernate `ddl-auto: update`. Для более серьезной версии проекта следующим шагом лучше добавить миграции Flyway или Liquibase.
 
 ## Авторизация
@@ -93,7 +111,7 @@ password: admin123
 role: ADMIN
 ```
 
-Регистрация:
+Регистрация теперь двухшаговая: сначала backend отправляет код на почту, а пользователь создается только после подтверждения.
 
 ```http
 POST /api/auth/register
@@ -107,6 +125,30 @@ Content-Type: application/json
   "password": "secret123"
 }
 ```
+
+Ответ:
+
+```json
+{
+  "expiresAt": "2026-06-05T10:10:00Z"
+}
+```
+
+Подтверждение регистрации:
+
+```http
+POST /api/auth/register/confirm
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "student@example.com",
+  "code": "123456"
+}
+```
+
+После подтверждения backend создает пользователя и возвращает токен.
 
 Логин:
 
@@ -132,7 +174,8 @@ Content-Type: application/json
     "id": 1,
     "email": "student@example.com",
     "username": "Student",
-    "role": "USER"
+    "role": "USER",
+    "avatarUrl": null
   }
 }
 ```
@@ -141,6 +184,34 @@ Content-Type: application/json
 
 ```http
 Authorization: Bearer generated-token
+```
+
+Восстановление пароля:
+
+```http
+POST /api/auth/password/forgot
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "student@example.com"
+}
+```
+
+Подтверждение нового пароля:
+
+```http
+POST /api/auth/password/reset
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "student@example.com",
+  "code": "123456",
+  "newPassword": "newSecret123"
+}
 ```
 
 ## Каталог Языков И Тестов
@@ -367,6 +438,79 @@ Authorization: Bearer token
 }
 ```
 
+Настройки аккаунта:
+
+```http
+PATCH /api/profile/name
+Authorization: Bearer token
+Content-Type: application/json
+```
+
+```json
+{
+  "username": "New Name"
+}
+```
+
+Смена email:
+
+```http
+POST /api/profile/email/change/request
+Authorization: Bearer token
+Content-Type: application/json
+```
+
+```json
+{
+  "newEmail": "new-email@example.com"
+}
+```
+
+```http
+POST /api/profile/email/change/confirm
+Authorization: Bearer token
+Content-Type: application/json
+```
+
+```json
+{
+  "newEmail": "new-email@example.com",
+  "code": "123456"
+}
+```
+
+Смена пароля из профиля:
+
+```http
+POST /api/profile/password/change/request
+POST /api/profile/password/change/confirm
+Authorization: Bearer token
+```
+
+Body для подтверждения:
+
+```json
+{
+  "code": "123456",
+  "newPassword": "newSecret123"
+}
+```
+
+Аватарка:
+
+```http
+POST /api/profile/avatar
+Authorization: Bearer token
+Content-Type: multipart/form-data
+```
+
+Поле файла называется `file`. Поддерживаются `image/jpeg`, `image/png`, `image/webp`. По умолчанию файлы хранятся в `uploads/avatars`, путь можно поменять через `AVATARS_DIR`.
+
+```http
+DELETE /api/profile/avatar
+GET /api/profile/avatar/{fileName}
+```
+
 ## Админка
 
 Все админские ручки требуют `Authorization: Bearer admin-token`, а пользователь должен иметь роль `ADMIN`.
@@ -489,6 +633,14 @@ SHORT_TEXT - нужен correctTextAnswer
 ## TypeScript Модели
 
 ```ts
+export type CurrentUser = {
+  id: number;
+  email: string;
+  username: string;
+  role: "USER" | "ADMIN";
+  avatarUrl: string | null;
+};
+
 export type TestSummary = {
   id: number;
   title: string;

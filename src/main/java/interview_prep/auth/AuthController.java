@@ -18,8 +18,13 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
-        return authService.register(request);
+    public VerificationStartResponse register(@Valid @RequestBody RegisterRequest request) {
+        return authService.requestRegistration(request);
+    }
+
+    @PostMapping("/register/confirm")
+    public AuthResponse confirmRegistration(@Valid @RequestBody AuthRequests.ConfirmRegistrationRequest request) {
+        return authService.confirmRegistration(request);
     }
 
     @PostMapping("/login")
@@ -33,6 +38,16 @@ public class AuthController {
         if (header != null && header.startsWith("Bearer ")) {
             authService.logout(header.substring(7));
         }
+    }
+
+    @PostMapping("/password/forgot")
+    public VerificationStartResponse forgotPassword(@Valid @RequestBody AuthRequests.ForgotPasswordRequest request) {
+        return authService.requestPasswordReset(request);
+    }
+
+    @PostMapping("/password/reset")
+    public void resetPassword(@Valid @RequestBody AuthRequests.ResetPasswordRequest request) {
+        authService.resetPassword(request);
     }
 
     @GetMapping("/me")
