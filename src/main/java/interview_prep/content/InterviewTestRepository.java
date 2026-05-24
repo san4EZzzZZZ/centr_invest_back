@@ -9,12 +9,14 @@ import java.util.List;
 public interface InterviewTestRepository extends JpaRepository<InterviewTest, Long> {
     List<InterviewTest> findByProfessionIdOrderByTitle(Long professionId);
 
+    long countByProfessionId(Long professionId);
+
     @Query("""
             select test from InterviewTest test
             join fetch test.profession profession
             order by profession.title, test.title
             """)
-    List<InterviewTest> findAllWithProfession();
+    List<InterviewTest> findAllWithLanguage();
 
     @Query("""
             select test from InterviewTest test
@@ -30,7 +32,7 @@ public interface InterviewTestRepository extends JpaRepository<InterviewTest, Lo
             where lower(profession.title) like lower(concat('%', :profession, '%'))
             order by profession.title, test.title
             """)
-    List<InterviewTest> searchByProfession(@Param("profession") String profession);
+    List<InterviewTest> searchByLanguage(@Param("profession") String profession);
 
     @Query("""
             select test from InterviewTest test
@@ -39,6 +41,6 @@ public interface InterviewTestRepository extends JpaRepository<InterviewTest, Lo
               and lower(profession.title) like lower(concat('%', :profession, '%'))
             order by profession.title, test.title
             """)
-    List<InterviewTest> searchByTitleAndProfession(@Param("title") String title,
-                                                   @Param("profession") String profession);
+    List<InterviewTest> searchByTitleAndLanguage(@Param("title") String title,
+                                                 @Param("profession") String profession);
 }

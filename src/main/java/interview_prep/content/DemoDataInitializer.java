@@ -8,8 +8,33 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+
 @Component
 public class DemoDataInitializer implements CommandLineRunner {
+    public static final List<String> LANGUAGE_TITLES = List.of(
+            "Python",
+            "Java",
+            "C++",
+            "C#",
+            "SQL",
+            "PHP",
+            "JavaScript",
+            "GO"
+    );
+
+    private static final Map<String, String> LANGUAGE_DESCRIPTIONS = Map.of(
+            "Python", "Тесты для junior-ролей, где Python используется в backend, аналитике, автоматизации и full-stack разработке.",
+            "Java", "Тесты для junior Java-разработчиков: core, backend, Spring, SQL и REST API.",
+            "C++", "Тесты для junior C++-разработчиков: синтаксис, память, STL, ООП и базовые алгоритмы.",
+            "C#", "Тесты для junior C#/.NET-разработчиков: язык, LINQ, ASP.NET, базы данных и ООП.",
+            "SQL", "Тесты для ролей, где важны запросы, модели данных, JOIN, агрегации и индексы.",
+            "PHP", "Тесты для junior PHP-разработчиков: язык, веб, Composer, Laravel и работа с БД.",
+            "JavaScript", "Тесты для frontend, full-stack и Node.js junior-ролей.",
+            "GO", "Тесты для junior Go-разработчиков: синтаксис, goroutines, HTTP, ошибки и работа с данными."
+    );
+
     private final ProfessionRepository professions;
     private final InterviewTestRepository tests;
     private final QuestionRepository questions;
@@ -33,100 +58,120 @@ public class DemoDataInitializer implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         seedAdmin();
+        seedLanguages();
+        migrateLegacyJavaProfession();
+        seedJavaDemoTest();
+    }
 
-        if (professions.existsByTitle("Backend Java Developer")) {
-            attachLegacyQuestionsToDemoTest();
+    private void seedLanguages() {
+        LANGUAGE_TITLES.forEach(title -> professions.findByTitle(title)
+                .ifPresentOrElse(
+                        language -> {
+                            language.setDescription(LANGUAGE_DESCRIPTIONS.get(title));
+                            professions.save(language);
+                        },
+                        () -> professions.save(new Profession(title, LANGUAGE_DESCRIPTIONS.get(title)))
+                ));
+    }
+
+    private void migrateLegacyJavaProfession() {
+        Profession java = professions.findByTitle("Java")
+                .orElseThrow(() -> new IllegalStateException("Java language category was not seeded"));
+        professions.findByTitle("Backend Java Developer").ifPresent(legacy -> {
+            tests.findByProfessionIdOrderByTitle(legacy.getId()).forEach(test -> {
+                test.setProfession(java);
+                tests.save(test);
+            });
+            questions.findByProfessionIdOrderByPosition(legacy.getId()).forEach(question -> {
+                question.setProfession(java);
+                questions.save(question);
+            });
+            if (tests.countByProfessionId(legacy.getId()) == 0) {
+                professions.delete(legacy);
+            }
+        });
+    }
+
+    private void seedJavaDemoTest() {
+        Profession java = professions.findByTitle("Java")
+                .orElseThrow(() -> new IllegalStateException("Java language category was not seeded"));
+
+        InterviewTest javaBasics = tests.findByProfessionIdOrderByTitle(java.getId()).stream()
+                .filter(test -> test.getTitle().equals("Junior Java Backend-разработчик"))
+                .findFirst()
+                .orElseGet(() -> tests.save(new InterviewTest(
+                        java,
+                        "Junior Java Backend-разработчик",
+                        "Базовая проверка Java backend: HTTP, Java Core, SQL, JPA, Spring и REST.",
+                        "Пул вопросов для подготовки к junior Java backend собеседованию. При старте попытки сервер выбирает до 7 вопросов нужных типов из пула этого теста."
+                )));
+
+        if (questions.countByTestId(javaBasics.getId()) > 0) {
+            attachLegacyQuestionsToTest(javaBasics);
             return;
         }
 
-        Profession backend = professions.save(new Profession(
-                "Backend Java Developer",
-                "Базовая проверка знаний Java, HTTP, SQL, Spring и REST API для junior backend-разработчика."
-        ));
-        InterviewTest javaBasics = tests.save(new InterviewTest(
-                backend,
-                "Java Backend: базовое собеседование",
-                "Короткая проверка базы Java backend.",
-                "7 вопросов разных типов: один ответ, несколько ответов, соответствие и короткий текст."
-        ));
-
-        Question q1 = question(backend, javaBasics, 1, QuestionType.SINGLE_CHOICE, "HTTP",
+        Question q1 = question(java, javaBasics, 1, QuestionType.SINGLE_CHOICE, "HTTP",
                 "Какой HTTP-метод обычно используют для получения ресурса без изменения состояния сервера?",
-                null,
-                "GET предназначен для чтения ресурса. Он должен быть безопасным: сам запрос не должен менять состояние сервера.",
-                "https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/GET");
+                null);
         options.save(new QuestionOption(q1, "GET", true));
         options.save(new QuestionOption(q1, "POST", false));
         options.save(new QuestionOption(q1, "PATCH", false));
         options.save(new QuestionOption(q1, "DELETE", false));
 
-        Question q2 = question(backend, javaBasics, 2, QuestionType.MULTIPLE_CHOICE, "Java Collections",
-                "Какие коллекции в Java обычно гарантируют уникальность элементов?",
-                null,
-                "Интерфейс Set описывает набор уникальных элементов. HashSet и TreeSet являются его распространенными реализациями.",
-                "https://docs.oracle.com/javase/tutorial/collections/interfaces/set.html");
-        options.save(new QuestionOption(q2, "ArrayList", false));
-        options.save(new QuestionOption(q2, "HashSet", true));
-        options.save(new QuestionOption(q2, "TreeSet", true));
-        options.save(new QuestionOption(q2, "LinkedList", false));
-
-        Question q3 = question(backend, javaBasics, 3, QuestionType.MATCHING, "SQL",
-                "Сопоставь SQL-операцию с ее назначением.",
-                null,
-                "SELECT читает данные, INSERT добавляет строки, UPDATE изменяет существующие строки, DELETE удаляет строки.",
-                "https://www.postgresql.org/docs/current/tutorial-sql.html");
-        pairs.save(new MatchPair(q3, "SELECT", "Получение данных"));
-        pairs.save(new MatchPair(q3, "INSERT", "Добавление строки"));
-        pairs.save(new MatchPair(q3, "UPDATE", "Изменение строки"));
-        pairs.save(new MatchPair(q3, "DELETE", "Удаление строки"));
-
-        question(backend, javaBasics, 4, QuestionType.SHORT_TEXT, "Spring",
-                "Как называется Spring-аннотация, которой обычно помечают класс REST-контроллера?",
-                "@RestController",
-                "@RestController объединяет @Controller и @ResponseBody, поэтому методы возвращают данные в тело HTTP-ответа.",
-                "https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-restcontroller.html");
-
-        Question q5 = question(backend, javaBasics, 5, QuestionType.SINGLE_CHOICE, "JPA",
+        Question q2 = question(java, javaBasics, 2, QuestionType.SINGLE_CHOICE, "JPA",
                 "Что обычно означает аннотация @Entity в JPA?",
-                null,
-                "@Entity помечает класс как сущность, состояние которой может сохраняться в таблице базы данных.",
-                "https://jakarta.ee/specifications/persistence/");
-        options.save(new QuestionOption(q5, "Класс является Spring REST-контроллером", false));
-        options.save(new QuestionOption(q5, "Класс является сохраняемой JPA-сущностью", true));
-        options.save(new QuestionOption(q5, "Метод будет выполнен в транзакции", false));
-        options.save(new QuestionOption(q5, "Поле нельзя записывать в базу", false));
+                null);
+        options.save(new QuestionOption(q2, "Класс является REST-контроллером", false));
+        options.save(new QuestionOption(q2, "Класс является сохраняемой JPA-сущностью", true));
+        options.save(new QuestionOption(q2, "Метод выполняется в транзакции", false));
+        options.save(new QuestionOption(q2, "Поле нельзя записывать в базу", false));
 
-        Question q6 = question(backend, javaBasics, 6, QuestionType.MULTIPLE_CHOICE, "REST",
+        Question q3 = question(java, javaBasics, 3, QuestionType.MULTIPLE_CHOICE, "Java Collections",
+                "Какие коллекции Java обычно гарантируют уникальность элементов?",
+                null);
+        options.save(new QuestionOption(q3, "ArrayList", false));
+        options.save(new QuestionOption(q3, "HashSet", true));
+        options.save(new QuestionOption(q3, "TreeSet", true));
+        options.save(new QuestionOption(q3, "LinkedList", false));
+
+        Question q4 = question(java, javaBasics, 4, QuestionType.MULTIPLE_CHOICE, "REST",
                 "Какие признаки обычно относятся к REST API?",
-                null,
-                "REST строится вокруг ресурсов, стандартных HTTP-методов и статeless-взаимодействия между клиентом и сервером.",
-                "https://restfulapi.net/");
-        options.save(new QuestionOption(q6, "Ресурсы имеют URI", true));
-        options.save(new QuestionOption(q6, "Сервер хранит состояние UI каждого клиента", false));
-        options.save(new QuestionOption(q6, "Используются стандартные HTTP-методы", true));
-        options.save(new QuestionOption(q6, "Каждый запрос должен содержать достаточно контекста для обработки", true));
+                null);
+        options.save(new QuestionOption(q4, "Ресурсы имеют URI", true));
+        options.save(new QuestionOption(q4, "Сервер хранит состояние UI каждого клиента", false));
+        options.save(new QuestionOption(q4, "Используются стандартные HTTP-методы", true));
+        options.save(new QuestionOption(q4, "Каждый запрос содержит достаточно контекста для обработки", true));
 
-        question(backend, javaBasics, 7, QuestionType.SHORT_TEXT, "Java Core",
+        Question q5 = question(java, javaBasics, 5, QuestionType.MATCHING, "SQL",
+                "Сопоставь SQL-операцию с ее назначением.",
+                null);
+        pairs.save(new MatchPair(q5, "SELECT", "Получение данных"));
+        pairs.save(new MatchPair(q5, "INSERT", "Добавление строки"));
+        pairs.save(new MatchPair(q5, "UPDATE", "Изменение строки"));
+        pairs.save(new MatchPair(q5, "DELETE", "Удаление строки"));
+
+        question(java, javaBasics, 6, QuestionType.SHORT_TEXT, "Spring",
+                "Как называется Spring-аннотация, которой обычно помечают класс REST-контроллера?",
+                "@RestController");
+
+        question(java, javaBasics, 7, QuestionType.SHORT_TEXT, "Java Core",
                 "Какое ключевое слово в Java используется для наследования класса?",
-                "extends",
-                "Класс наследует другой класс с помощью extends. Для реализации интерфейса используется implements.",
-                "https://docs.oracle.com/javase/tutorial/java/IandI/subclasses.html");
+                "extends");
     }
 
-    private Question question(Profession profession, InterviewTest test, int position, QuestionType type, String topic, String prompt,
-                              String correctTextAnswer, String explanation, String readMoreUrl) {
-        return questions.save(new Question(profession, test, position, type, topic, prompt, correctTextAnswer));
+    private Question question(Profession language, InterviewTest test, int position, QuestionType type, String topic,
+                              String prompt, String correctTextAnswer) {
+        return questions.save(new Question(language, test, position, type, topic, prompt, correctTextAnswer));
     }
 
-    private void attachLegacyQuestionsToDemoTest() {
-        professions.findByTitle("Backend Java Developer")
-                .flatMap(profession -> tests.findByProfessionIdOrderByTitle(profession.getId()).stream().findFirst())
-                .ifPresent(test -> questions.findByProfessionIdOrderByPosition(test.getProfession().getId()).stream()
-                        .filter(question -> question.getTest() == null)
-                        .forEach(question -> {
-                            question.setTest(test);
-                            questions.save(question);
-                        }));
+    private void attachLegacyQuestionsToTest(InterviewTest test) {
+        questions.findByProfessionIdOrderByPosition(test.getProfession().getId()).stream()
+                .filter(question -> question.getTest() == null)
+                .forEach(question -> {
+                    question.setTest(test);
+                    questions.save(question);
+                });
     }
 
     private void seedAdmin() {

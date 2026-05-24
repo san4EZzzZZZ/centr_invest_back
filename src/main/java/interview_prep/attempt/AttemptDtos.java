@@ -44,7 +44,7 @@ public class AttemptDtos {
 
     public record RecentAttemptResponse(
             Long attemptId,
-            String professionTitle,
+            String languageTitle,
             String testTitle,
             int correctAnswers,
             int totalQuestions,

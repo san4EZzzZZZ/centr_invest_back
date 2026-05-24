@@ -1,6 +1,6 @@
 # Interview Prep Backend
 
-Backend для сервиса подготовки к техническому собеседованию. Пользователь выбирает профессию, запускает тест, отвечает на вопросы разных типов, получает пояснение после каждого ответа и итоговый разбор.
+Backend для сервиса подготовки к техническому собеседованию. Пользователь выбирает язык программирования, запускает тест по junior-роли на этом языке, отвечает на вопросы разных типов, получает пояснение после каждого ответа и итоговый разбор.
 
 ## Быстрый Старт
 
@@ -143,26 +143,41 @@ Content-Type: application/json
 Authorization: Bearer generated-token
 ```
 
-## Каталог Профессий И Тестов
+## Каталог Языков И Тестов
 
-Получить профессии с тестами:
+Получить языки с тестами:
 
 ```http
-GET /api/professions
+GET /api/languages
 ```
 
-Поиск по части названия теста и профессии:
+Строгий список языков:
+
+```text
+Python
+Java
+C++
+C#
+SQL
+PHP
+JavaScript
+GO
+```
+
+Поиск по части названия теста и языка:
 
 ```http
-GET /api/professions?title=java&profession=backend
+GET /api/languages?title=backend&language=java
 ```
 
 Параметры необязательные, поиск регистронезависимый:
 
 ```text
 title - часть названия теста
-profession - часть названия профессии
+language - часть названия языка
 ```
+
+Временная обратная совместимость: `GET /api/professions` и параметр `profession` пока тоже работают, но фронту лучше использовать `/api/languages` и `language`.
 
 Пример теста в ответе:
 
@@ -184,13 +199,13 @@ GET /api/tests/{testId}
 
 Current implementation: this endpoint returns metadata and the question pool of this exact test. Correct answers are still hidden from public clients.
 
-Data model note: `profession` is a catalog grouping, `interview_test` is a concrete test, and `question.test_id` points to the test that owns the question. Questions are not shared automatically between tests of the same profession.
+Data model note: the database table is still named `profession` for compatibility, but semantically it is now a strict language catalog. `interview_test` is a concrete test, and `question.test_id` points to the test that owns the question.
 
 Публичная ручка не отдает правильные ответы. Она возвращает метаданные теста и пул вопросов именно этого теста для отображения.
 
 ## Новая Логика Тестов
 
-Каждый тест хранит собственный пул вопросов. Профессия нужна как категория каталога, но вопросы не являются общими для всех тестов профессии.
+Каждый тест хранит собственный пул вопросов. Язык нужен как категория каталога, но вопросы не являются общими для всех тестов одного языка.
 
 При старте попытки backend выбирает только из пула выбранного теста:
 
@@ -343,8 +358,8 @@ Authorization: Bearer token
 ```json
 {
   "testId": 1,
-  "professionId": 1,
-  "professionTitle": "Backend Java Developer",
+  "languageId": 1,
+  "languageTitle": "Java",
   "testTitle": "Java Backend: базовое собеседование",
   "testShortDescription": "Короткая проверка базы Java backend.",
   "testDescription": "7 вопросов разных типов.",
@@ -368,11 +383,11 @@ Authorization: Bearer admin-token
 Поиск в админке:
 
 ```http
-GET /api/admin/tests?title=java&profession=backend
+GET /api/admin/tests?title=backend&language=java
 Authorization: Bearer admin-token
 ```
 
-Параметры `title` и `profession` ищут по части строки без учета регистра.
+Параметры `title` и `language` ищут по части строки без учета регистра.
 
 Детали теста с правильными ответами:
 
@@ -408,7 +423,7 @@ Body для создания и редактирования:
 
 ```json
 {
-  "professionId": 1,
+  "languageId": 1,
   "title": "Java Backend: новый тест",
   "shortDescription": "Короткая проверка Java, HTTP и SQL.",
   "description": "Тест для проверки базовых знаний.",
@@ -484,8 +499,8 @@ export type TestSummary = {
 
 export type FavoriteTest = {
   testId: number;
-  professionId: number;
-  professionTitle: string;
+  languageId: number;
+  languageTitle: string;
   testTitle: string;
   testShortDescription: string;
   testDescription: string;

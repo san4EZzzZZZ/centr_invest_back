@@ -9,12 +9,16 @@ import java.util.List;
 
 public class AdminDtos {
     public record TestUpsertRequest(
-            @NotNull Long professionId,
+            Long languageId,
+            Long professionId,
             @NotBlank String title,
             @NotBlank String shortDescription,
             @NotBlank String description,
             @Valid List<QuestionUpsertRequest> questions
     ) {
+        public Long effectiveLanguageId() {
+            return languageId != null ? languageId : professionId;
+        }
     }
 
     public record QuestionUpsertRequest(
@@ -35,8 +39,8 @@ public class AdminDtos {
 
     public record TestSummaryResponse(
             Long id,
-            Long professionId,
-            String professionTitle,
+            Long languageId,
+            String languageTitle,
             String title,
             String shortDescription,
             String description,
@@ -46,8 +50,8 @@ public class AdminDtos {
 
     public record TestDetailsResponse(
             Long id,
-            Long professionId,
-            String professionTitle,
+            Long languageId,
+            String languageTitle,
             String title,
             String shortDescription,
             String description,

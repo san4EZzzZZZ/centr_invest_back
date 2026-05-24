@@ -88,7 +88,7 @@ public class ProfileController {
                                   List<FavoriteTestResponse> favoriteTests) {
     }
 
-    public record FavoriteTestResponse(Long testId, Long professionId, String professionTitle, String testTitle,
+    public record FavoriteTestResponse(Long testId, Long languageId, String languageTitle, String testTitle,
                                        String testShortDescription, String testDescription, Instant addedAt) {
     }
 }

@@ -28,16 +28,20 @@ public class ContentController {
         this.mapper = mapper;
     }
 
-    @GetMapping("/professions")
+    @GetMapping({"/languages", "/professions"})
     @Transactional(readOnly = true)
-    public List<ContentDtos.ProfessionResponse> professions(@RequestParam(required = false) String title,
-                                                            @RequestParam(required = false) String profession) {
-        if (hasText(title) || hasText(profession)) {
-            return searchedProfessions(blankToNull(title), blankToNull(profession));
+    public List<ContentDtos.LanguageResponse> languages(@RequestParam(required = false) String title,
+                                                        @RequestParam(required = false) String language,
+                                                        @RequestParam(required = false) String profession) {
+        String languageFilter = firstPresent(language, profession);
+        if (hasText(title) || hasText(languageFilter)) {
+            return searchedLanguages(blankToNull(title), blankToNull(languageFilter));
         }
 
-        return professions.findAll().stream()
-                .map(foundProfession -> new ContentDtos.ProfessionResponse(
+        return DemoDataInitializer.LANGUAGE_TITLES.stream()
+                .map(professions::findByTitle)
+                .flatMap(java.util.Optional::stream)
+                .map(foundProfession -> new ContentDtos.LanguageResponse(
                         foundProfession.getId(),
                         foundProfession.getTitle(),
                         foundProfession.getDescription(),
@@ -71,12 +75,13 @@ public class ContentController {
         );
     }
 
-    private List<ContentDtos.ProfessionResponse> searchedProfessions(String title, String profession) {
-        return findTests(title, profession).stream()
+    private List<ContentDtos.LanguageResponse> searchedLanguages(String title, String language) {
+        return findTests(title, language).stream()
+                .filter(test -> DemoDataInitializer.LANGUAGE_TITLES.contains(test.getProfession().getTitle()))
                 .collect(Collectors.groupingBy(InterviewTest::getProfession, LinkedHashMap::new, Collectors.toList()))
                 .entrySet()
                 .stream()
-                .map(entry -> new ContentDtos.ProfessionResponse(
+                .map(entry -> new ContentDtos.LanguageResponse(
                         entry.getKey().getId(),
                         entry.getKey().getTitle(),
                         entry.getKey().getDescription(),
@@ -101,17 +106,21 @@ public class ContentController {
         return hasText(value) ? value.trim() : null;
     }
 
-    private List<InterviewTest> findTests(String title, String profession) {
-        if (title != null && profession != null) {
-            return tests.searchByTitleAndProfession(title, profession);
+    private String firstPresent(String preferred, String fallback) {
+        return hasText(preferred) ? preferred : fallback;
+    }
+
+    private List<InterviewTest> findTests(String title, String language) {
+        if (title != null && language != null) {
+            return tests.searchByTitleAndLanguage(title, language);
         }
         if (title != null) {
             return tests.searchByTitle(title);
         }
-        if (profession != null) {
-            return tests.searchByProfession(profession);
+        if (language != null) {
+            return tests.searchByLanguage(language);
         }
-        return tests.findAllWithProfession();
+        return tests.findAllWithLanguage();
     }
 
     private int questionCount(InterviewTest test) {

@@ -90,26 +90,26 @@ pm.test("current user has id and email", function () {
 });
 ```
 
-## 3. Get Professions
+## 3. Get Languages
 
-`GET {{baseUrl}}/professions`
+`GET {{baseUrl}}/languages`
 
 Tests:
 
 ```javascript
-pm.test("professions returns 200", function () {
+pm.test("languages returns 200", function () {
   pm.response.to.have.status(200);
 });
 
 const json = pm.response.json();
-const backend = json.find(item => item.title === "Backend Java Developer");
+const java = json.find(item => item.title === "Java");
 
-pm.test("backend profession exists", function () {
-  pm.expect(backend).to.exist;
-  pm.expect(backend.tests).to.have.length.above(0);
+pm.test("java language exists", function () {
+  pm.expect(java).to.exist;
+  pm.expect(java.tests).to.have.length.above(0);
 });
 
-pm.environment.set("testId", backend.tests[0].id);
+pm.environment.set("testId", java.tests[0].id);
 ```
 
 ## 4. Get Test Details

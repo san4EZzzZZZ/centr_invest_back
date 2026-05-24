@@ -26,9 +26,10 @@ public class AdminTestController {
 
     @GetMapping
     public List<AdminDtos.TestSummaryResponse> list(@RequestParam(required = false) String title,
+                                                    @RequestParam(required = false) String language,
                                                     @RequestParam(required = false) String profession) {
         adminGuard.requireAdmin();
-        return adminTestService.list(title, profession);
+        return adminTestService.list(title, language, profession);
     }
 
     @GetMapping("/{testId}")

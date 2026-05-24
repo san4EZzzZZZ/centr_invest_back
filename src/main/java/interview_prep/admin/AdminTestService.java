@@ -51,10 +51,11 @@ public class AdminTestService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminDtos.TestSummaryResponse> list(String title, String profession) {
+    public List<AdminDtos.TestSummaryResponse> list(String title, String language, String profession) {
         String titleFilter = blankToNull(title);
-        String professionFilter = blankToNull(profession);
-        return findTests(titleFilter, professionFilter).stream()
+        String languageFilter = blankToNull(firstPresent(language, profession));
+        return findTests(titleFilter, languageFilter).stream()
+                .filter(test -> interview_prep.content.DemoDataInitializer.LANGUAGE_TITLES.contains(test.getProfession().getTitle()))
                 .map(test -> new AdminDtos.TestSummaryResponse(
                         test.getId(),
                         test.getProfession().getId(),
@@ -76,8 +77,9 @@ public class AdminTestService {
     @Transactional
     public AdminDtos.TestDetailsResponse create(AdminDtos.TestUpsertRequest request) {
         validate(request);
-        Profession profession = professions.findById(request.professionId())
-                .orElseThrow(() -> new EntityNotFoundException("Profession not found"));
+        Profession profession = professions.findById(request.effectiveLanguageId())
+                .orElseThrow(() -> new EntityNotFoundException("Language not found"));
+        ensureSupportedLanguage(profession);
 
         InterviewTest test = tests.save(new InterviewTest(
                 profession,
@@ -93,8 +95,9 @@ public class AdminTestService {
     public AdminDtos.TestDetailsResponse update(Long testId, AdminDtos.TestUpsertRequest request) {
         validate(request);
         InterviewTest test = findTest(testId);
-        Profession profession = professions.findById(request.professionId())
-                .orElseThrow(() -> new EntityNotFoundException("Profession not found"));
+        Profession profession = professions.findById(request.effectiveLanguageId())
+                .orElseThrow(() -> new EntityNotFoundException("Language not found"));
+        ensureSupportedLanguage(profession);
 
         deleteAttempts(testId);
         deleteTestQuestions(test.getId());
@@ -213,11 +216,21 @@ public class AdminTestService {
     }
 
     private void validate(AdminDtos.TestUpsertRequest request) {
+        if (request.effectiveLanguageId() == null) {
+            throw new IllegalArgumentException("Test must contain languageId");
+        }
+
         if (request.questions() == null || request.questions().isEmpty()) {
             throw new IllegalArgumentException("Test must contain at least one question");
         }
 
         request.questions().forEach(this::validateQuestion);
+    }
+
+    private void ensureSupportedLanguage(Profession profession) {
+        if (!interview_prep.content.DemoDataInitializer.LANGUAGE_TITLES.contains(profession.getTitle())) {
+            throw new IllegalArgumentException("Unsupported language category");
+        }
     }
 
     private void validateQuestion(AdminDtos.QuestionUpsertRequest question) {
@@ -258,17 +271,21 @@ public class AdminTestService {
         return trimToNull(value);
     }
 
-    private List<InterviewTest> findTests(String title, String profession) {
-        if (title != null && profession != null) {
-            return tests.searchByTitleAndProfession(title, profession);
+    private String firstPresent(String preferred, String fallback) {
+        return trimToNull(preferred) != null ? preferred : fallback;
+    }
+
+    private List<InterviewTest> findTests(String title, String language) {
+        if (title != null && language != null) {
+            return tests.searchByTitleAndLanguage(title, language);
         }
         if (title != null) {
             return tests.searchByTitle(title);
         }
-        if (profession != null) {
-            return tests.searchByProfession(profession);
+        if (language != null) {
+            return tests.searchByLanguage(language);
         }
-        return tests.findAllWithProfession();
+        return tests.findAllWithLanguage();
     }
 
 }

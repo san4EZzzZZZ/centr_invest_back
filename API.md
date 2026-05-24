@@ -53,23 +53,38 @@ Authorization: Bearer bearer-token
 
 ## Content
 
-`GET /professions`
+`GET /languages`
 
-Returns professions and their tests.
+Returns strict language categories and tests inside each category.
+
+Supported languages are fixed:
+
+```text
+Python
+Java
+C++
+C#
+SQL
+PHP
+JavaScript
+GO
+```
 
 Optional case-insensitive substring search:
 
 ```text
-GET /professions?title=java&profession=backend
+GET /languages?title=backend&language=java
 ```
 
-`title` filters by part of the test title. `profession` filters by part of the profession title.
+`title` filters by part of the test title. `language` filters by part of the language title.
+
+Temporary compatibility alias: `GET /professions` and query parameter `profession` still work, but frontend should use `/languages` and `language`.
 
 `GET /tests/{testId}`
 
 Returns full test metadata and questions without correct answers.
 
-Important: each test owns its own question pool. A profession is only a catalog category for tests. When a user starts an attempt, the backend selects questions from the selected test pool:
+Important: each test owns its own question pool. A language is only a catalog category for tests. When a user starts an attempt, the backend selects questions from the selected test pool:
 
 ```text
 up to 2 SINGLE_CHOICE
@@ -226,15 +241,15 @@ The token must belong to a user with `role = ADMIN`.
 
 `GET /admin/tests`
 
-Returns all tests with profession info and question counts.
+Returns all tests with language info and question counts.
 
 Optional case-insensitive substring search:
 
 ```text
-GET /admin/tests?title=java&profession=backend
+GET /admin/tests?title=backend&language=java
 ```
 
-`title` searches by part of the test title. `profession` searches by part of the profession title.
+`title` searches by part of the test title. `language` searches by part of the language title.
 
 `GET /admin/tests/{testId}`
 
@@ -250,7 +265,7 @@ The questions from this request are saved into the created test's own question p
 
 Fully replaces test metadata and questions. Existing attempts for this test are deleted because old answers would no longer match the new question set.
 
-Update replaces only this test's question pool. Other tests of the same profession are not changed.
+Update replaces only this test's question pool. Other tests of the same language are not changed.
 
 `DELETE /admin/tests/{testId}`
 
@@ -260,7 +275,7 @@ Create/update request example:
 
 ```json
 {
-  "professionId": 1,
+  "languageId": 1,
   "title": "Java Backend: новый тест",
   "shortDescription": "Короткая проверка Java, HTTP и SQL.",
   "description": "Тест для проверки базовых знаний.",
