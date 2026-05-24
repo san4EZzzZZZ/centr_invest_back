@@ -15,7 +15,6 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.text.Normalizer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,11 +36,15 @@ public class AttemptService {
     private final AttemptQuestionRepository attemptQuestions;
     private final ContentMapper mapper;
     private final ShortTextAnswerReviewService shortTextAnswerReviewService;
+    private final AiExplanationService aiExplanationService;
+    private final AiReviewService aiReviewService;
 
     public AttemptService(InterviewTestRepository tests, QuestionRepository questions, QuestionOptionRepository options,
                           MatchPairRepository pairs, TestAttemptRepository attempts, AttemptAnswerRepository answers,
                           AttemptQuestionRepository attemptQuestions, ContentMapper mapper,
-                          ShortTextAnswerReviewService shortTextAnswerReviewService) {
+                          ShortTextAnswerReviewService shortTextAnswerReviewService,
+                          AiExplanationService aiExplanationService,
+                          AiReviewService aiReviewService) {
         this.tests = tests;
         this.questions = questions;
         this.options = options;
@@ -51,6 +54,8 @@ public class AttemptService {
         this.attemptQuestions = attemptQuestions;
         this.mapper = mapper;
         this.shortTextAnswerReviewService = shortTextAnswerReviewService;
+        this.aiExplanationService = aiExplanationService;
+        this.aiReviewService = aiReviewService;
     }
 
     @Transactional
@@ -100,6 +105,8 @@ public class AttemptService {
 
         AnswerCheck answerCheck = checkAnswer(question, request);
         boolean correct = answerCheck.correct();
+        AiExplanationService.GeneratedExplanation generatedExplanation =
+                aiExplanationService.explain(question, request, correct);
         answers.save(new AttemptAnswer(
                 attempt,
                 question,
@@ -126,11 +133,11 @@ public class AttemptService {
 
         return new AttemptDtos.AnswerResponse(
                 correct,
-                question.getExplanation(),
-                question.getReadMoreUrl(),
+                generatedExplanation.explanation(),
+                generatedExplanation.readMoreUrl(),
+                generatedExplanation.generatedByAi(),
                 answerCheck.checkedByAi(),
                 answerCheck.aiConfidence(),
-                answerCheck.aiReason(),
                 nextQuestion == null ? null : mapper.toQuestionResponse(nextQuestion),
                 result
         );
@@ -235,6 +242,7 @@ public class AttemptService {
                 attempt.getTotalQuestions(),
                 weakTopics,
                 recommendation,
+                aiReviewService.review(attempt.getId()),
                 attempt.getCompletedAt()
         );
     }
@@ -245,14 +253,6 @@ public class AttemptService {
                 request.matches(),
                 request.textAnswer()
         );
-    }
-
-    private String normalize(String value) {
-        if (value == null) {
-            return "";
-        }
-        return Normalizer.normalize(value.trim().toLowerCase(), Normalizer.Form.NFKC)
-                .replaceAll("\\s+", " ");
     }
 
     private record AnswerCheck(boolean correct, boolean checkedByAi, Double aiConfidence, String aiReason) {

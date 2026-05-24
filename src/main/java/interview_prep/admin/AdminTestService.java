@@ -131,9 +131,7 @@ public class AdminTestService {
                     request.type(),
                     request.topic().trim(),
                     request.prompt().trim(),
-                    trimToNull(request.correctTextAnswer()),
-                    request.explanation().trim(),
-                    request.readMoreUrl().trim()
+                    trimToNull(request.correctTextAnswer())
             ));
 
             if (request.options() != null) {
@@ -197,8 +195,6 @@ public class AdminTestService {
                 question.getTopic(),
                 question.getPrompt(),
                 question.getCorrectTextAnswer(),
-                question.getExplanation(),
-                question.getReadMoreUrl(),
                 options.findByQuestionIdOrderById(question.getId()).stream()
                         .map(option -> new AdminDtos.OptionDetailsResponse(
                                 option.getId(),

@@ -44,14 +44,14 @@ public class Question {
     @Column(length = 300)
     private String correctTextAnswer;
 
-    @Column(nullable = false, columnDefinition = "text")
+    @Column(columnDefinition = "text")
     private String explanation;
 
-    @Column(nullable = false)
+    @Column
     private String readMoreUrl;
 
     public Question(Profession profession, InterviewTest test, int position, QuestionType type, String topic, String prompt,
-                    String correctTextAnswer, String explanation, String readMoreUrl) {
+                    String correctTextAnswer) {
         this.profession = profession;
         this.test = test;
         this.position = position;
@@ -59,12 +59,10 @@ public class Question {
         this.topic = topic;
         this.prompt = prompt;
         this.correctTextAnswer = correctTextAnswer;
-        this.explanation = explanation;
-        this.readMoreUrl = readMoreUrl;
     }
 
     public Question(Profession profession, int position, QuestionType type, String topic, String prompt,
-                    String correctTextAnswer, String explanation, String readMoreUrl) {
-        this(profession, null, position, type, topic, prompt, correctTextAnswer, explanation, readMoreUrl);
+                    String correctTextAnswer) {
+        this(profession, null, position, type, topic, prompt, correctTextAnswer);
     }
 }

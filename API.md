@@ -130,7 +130,7 @@ Short text:
 }
 ```
 
-Answer response includes `correct`, `explanation`, `readMoreUrl`, AI short-text check fields, and either `nextQuestion` or final `result`.
+Answer response includes `correct`, generated `explanation`, generated `readMoreUrl`, `explanationGeneratedByAi`, AI short-text check fields, and either `nextQuestion` or final `result`.
 
 For `SHORT_TEXT`, the backend first uses strict normalized comparison. If it does not match and AI is configured, the backend asks the model whether the submitted answer is semantically equivalent to the expected answer.
 
@@ -141,9 +141,9 @@ Example answer response fragment:
   "correct": true,
   "explanation": "Для наследования класса используется extends.",
   "readMoreUrl": "https://docs.oracle.com/javase/tutorial/java/IandI/subclasses.html",
+  "explanationGeneratedByAi": true,
   "checkedByAi": true,
   "aiConfidence": 0.91,
-  "aiReason": "Student answer has the same meaning as the expected answer.",
   "nextQuestion": null,
   "result": null
 }
@@ -151,13 +151,13 @@ Example answer response fragment:
 
 `GET /attempts/{attemptId}/result`
 
-Returns final score, weak topics, and recommendation. Available after completion.
+Returns final score, weak topics, recommendation, and generated `aiReview`. Available after completion.
 
 `GET /attempts/{attemptId}/ai-review`
 
 Returns a final personalized review based on the user's answers. Available after completion.
 
-If `AI_API_KEY` and `AI_MODEL` are configured, the backend asks the model to generate a concise Russian review. If the key is missing or the provider call fails, the backend returns a deterministic fallback review from stored explanations and resource URLs.
+If `AI_API_KEY` and `AI_MODEL` are configured, the backend asks the model to generate a concise Russian review and resource links from the user's answers. If the key is missing or the provider call fails, the backend returns a deterministic fallback review and search links.
 
 Example response:
 
@@ -267,8 +267,6 @@ Create/update request example:
       "type": "SINGLE_CHOICE",
       "topic": "HTTP",
       "prompt": "Какой метод используют для чтения ресурса?",
-      "explanation": "GET используют для получения ресурса без изменения состояния сервера.",
-      "readMoreUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/GET",
       "options": [
         {
           "text": "GET",
@@ -286,8 +284,6 @@ Create/update request example:
       "topic": "Java Core",
       "prompt": "Ключевое слово для наследования класса?",
       "correctTextAnswer": "extends",
-      "explanation": "Для наследования класса используется extends.",
-      "readMoreUrl": "https://docs.oracle.com/javase/tutorial/java/IandI/subclasses.html",
       "options": [],
       "matchPairs": []
     }

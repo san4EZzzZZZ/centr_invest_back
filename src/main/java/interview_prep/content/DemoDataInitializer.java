@@ -115,7 +115,7 @@ public class DemoDataInitializer implements CommandLineRunner {
 
     private Question question(Profession profession, InterviewTest test, int position, QuestionType type, String topic, String prompt,
                               String correctTextAnswer, String explanation, String readMoreUrl) {
-        return questions.save(new Question(profession, test, position, type, topic, prompt, correctTextAnswer, explanation, readMoreUrl));
+        return questions.save(new Question(profession, test, position, type, topic, prompt, correctTextAnswer));
     }
 
     private void attachLegacyQuestionsToDemoTest() {

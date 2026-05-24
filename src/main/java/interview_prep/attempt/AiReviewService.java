@@ -2,6 +2,11 @@ package interview_prep.attempt;
 
 import interview_prep.auth.CurrentUserContext;
 import interview_prep.auth.UserAccount;
+import interview_prep.content.MatchPairRepository;
+import interview_prep.content.Question;
+import interview_prep.content.QuestionOption;
+import interview_prep.content.QuestionOptionRepository;
+import interview_prep.content.QuestionType;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -20,18 +25,24 @@ import java.util.stream.Collectors;
 public class AiReviewService {
     private final TestAttemptRepository attempts;
     private final AttemptAnswerRepository answers;
+    private final QuestionOptionRepository options;
+    private final MatchPairRepository pairs;
     private final RestClient restClient;
-    private final String openAiApiKey;
+    private final String apiKey;
     private final String model;
 
     public AiReviewService(TestAttemptRepository attempts,
                            AttemptAnswerRepository answers,
+                           QuestionOptionRepository options,
+                           MatchPairRepository pairs,
                            @Value("${app.ai.openai.base-url}") String baseUrl,
-                           @Value("${app.ai.openai.api-key:}") String openAiApiKey,
+                           @Value("${app.ai.openai.api-key:}") String apiKey,
                            @Value("${app.ai.openai.model:}") String model) {
         this.attempts = attempts;
         this.answers = answers;
-        this.openAiApiKey = openAiApiKey;
+        this.options = options;
+        this.pairs = pairs;
+        this.apiKey = apiKey;
         this.model = model;
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
@@ -44,16 +55,26 @@ public class AiReviewService {
         List<AttemptAnswer> attemptAnswers = answers.findByAttemptIdOrderByQuestionPosition(attemptId);
         ReviewContext context = buildContext(attempt, attemptAnswers);
 
-        if (openAiApiKey == null || openAiApiKey.isBlank() || model == null || model.isBlank()) {
+        if (apiKey == null || apiKey.isBlank() || model == null || model.isBlank()) {
             return fallbackReview(attemptId, context);
         }
 
         try {
-            String generated = callOpenAi(context);
-            return fromGeneratedText(attemptId, context, generated);
-        } catch (RuntimeException exception) {
-            return fallbackReview(attemptId, context);
+            String generated = callModel(context);
+            if (generated != null && !generated.isBlank()) {
+                return new AttemptDtos.AiReviewResponse(
+                        attemptId,
+                        true,
+                        generated,
+                        topicReviews(context),
+                        resources(context),
+                        "Выбери одну слабую тему, прочитай ресурс из списка и затем пройди похожий тест повторно."
+                );
+            }
+        } catch (RuntimeException ignored) {
+            // Fallback keeps result endpoints available even if the provider is temporarily unavailable.
         }
+        return fallbackReview(attemptId, context);
     }
 
     private TestAttempt ownedCompletedAttempt(Long attemptId) {
@@ -72,26 +93,11 @@ public class AiReviewService {
     private ReviewContext buildContext(TestAttempt attempt, List<AttemptAnswer> attemptAnswers) {
         List<AnswerReviewItem> incorrect = attemptAnswers.stream()
                 .filter(answer -> !answer.isCorrect())
-                .map(answer -> new AnswerReviewItem(
-                        answer.getQuestion().getTopic(),
-                        answer.getQuestion().getPrompt(),
-                        answer.getSubmittedAnswer(),
-                        answer.getQuestion().getExplanation(),
-                        answer.getQuestion().getReadMoreUrl()
-                ))
+                .map(this::toReviewItem)
                 .toList();
 
         List<AnswerReviewItem> sourceItems = incorrect.isEmpty()
-                ? attemptAnswers.stream()
-                .map(answer -> new AnswerReviewItem(
-                        answer.getQuestion().getTopic(),
-                        answer.getQuestion().getPrompt(),
-                        answer.getSubmittedAnswer(),
-                        answer.getQuestion().getExplanation(),
-                        answer.getQuestion().getReadMoreUrl()
-                ))
-                .limit(4)
-                .toList()
+                ? attemptAnswers.stream().map(this::toReviewItem).limit(4).toList()
                 : incorrect;
 
         Map<String, List<AnswerReviewItem>> byTopic = sourceItems.stream()
@@ -110,15 +116,29 @@ public class AiReviewService {
         );
     }
 
-    private String callOpenAi(ReviewContext context) {
+    private AnswerReviewItem toReviewItem(AttemptAnswer answer) {
+        Question question = answer.getQuestion();
+        return new AnswerReviewItem(
+                question.getTopic(),
+                question.getPrompt(),
+                answer.getSubmittedAnswer(),
+                correctAnswer(question)
+        );
+    }
+
+    private String callModel(ReviewContext context) {
         Map<String, Object> body = Map.of(
                 "model", model,
                 "temperature", 0.2,
-                "max_tokens", 900,
+                "max_tokens", 1000,
                 "messages", List.of(
                         Map.of(
                                 "role", "system",
-                                "content", "You are an interview preparation mentor. Return concise practical feedback in Russian."
+                                "content", """
+                                        You are an interview preparation mentor.
+                                        Write concise practical feedback in Russian.
+                                        Include 3-5 real public learning links as markdown links.
+                                        """
                         ),
                         Map.of(
                                 "role", "user",
@@ -131,33 +151,28 @@ public class AiReviewService {
         Map<String, Object> response = restClient.post()
                 .uri("/chat/completions")
                 .contentType(MediaType.APPLICATION_JSON)
-                .header("Authorization", "Bearer " + openAiApiKey)
+                .header("Authorization", "Bearer " + apiKey)
                 .body(body)
                 .retrieve()
                 .body(Map.class);
 
-        return extractChatCompletionText(response);
+        return extractMessageContent(response);
     }
 
     private String prompt(ReviewContext context) {
         StringBuilder builder = new StringBuilder();
-        builder.append("You are an interview preparation mentor. ");
-        builder.append("Write a final review in Russian for a student after a technical interview-prep test. ");
-        builder.append("Do not invent URLs. Use only URLs from the provided context. ");
-        builder.append("Keep the response concise and practical.\n\n");
         builder.append("Test: ").append(context.testTitle()).append('\n');
         builder.append("Score: ").append(context.correctAnswers()).append('/').append(context.totalQuestions()).append("\n\n");
 
         if (context.incorrectAnswers().isEmpty()) {
-            builder.append("The student answered all questions correctly. Recommend next steps and still include useful resources from context.\n\n");
+            builder.append("The student answered all questions correctly. Recommend next steps and useful resources.\n\n");
         } else {
             builder.append("Incorrect answers:\n");
             for (AnswerReviewItem item : context.incorrectAnswers()) {
                 builder.append("- Topic: ").append(item.topic()).append('\n');
                 builder.append("  Question: ").append(item.prompt()).append('\n');
                 builder.append("  Submitted: ").append(item.submittedAnswer()).append('\n');
-                builder.append("  Explanation: ").append(item.explanation()).append('\n');
-                builder.append("  Resource: ").append(item.readMoreUrl()).append("\n\n");
+                builder.append("  Correct answer: ").append(item.correctAnswer()).append("\n\n");
             }
         }
 
@@ -169,48 +184,13 @@ public class AiReviewService {
         return builder.toString();
     }
 
-    private String extractOutputText(Map<String, Object> response) {
-        if (response == null) {
-            return "";
-        }
-        Object directText = response.get("output_text");
-        if (directText instanceof String text && !text.isBlank()) {
-            return text;
-        }
-
-        Object output = response.get("output");
-        if (!(output instanceof List<?> outputItems)) {
-            return "";
-        }
-
-        StringBuilder builder = new StringBuilder();
-        for (Object outputItem : outputItems) {
-            if (!(outputItem instanceof Map<?, ?> outputMap)) {
-                continue;
-            }
-            Object content = outputMap.get("content");
-            if (!(content instanceof List<?> contentItems)) {
-                continue;
-            }
-            for (Object contentItem : contentItems) {
-                if (contentItem instanceof Map<?, ?> contentMap) {
-                    Object text = contentMap.get("text");
-                    if (text instanceof String value) {
-                        builder.append(value).append('\n');
-                    }
-                }
-            }
-        }
-        return builder.toString().trim();
-    }
-
-    private String extractChatCompletionText(Map<String, Object> response) {
+    private String extractMessageContent(Map<String, Object> response) {
         if (response == null) {
             return "";
         }
         Object choices = response.get("choices");
         if (!(choices instanceof List<?> choiceItems) || choiceItems.isEmpty()) {
-            return extractOutputText(response);
+            return "";
         }
         Object firstChoice = choiceItems.getFirst();
         if (!(firstChoice instanceof Map<?, ?> choiceMap)) {
@@ -222,21 +202,6 @@ public class AiReviewService {
         }
         Object content = messageMap.get("content");
         return content instanceof String text ? text.trim() : "";
-    }
-
-    private AttemptDtos.AiReviewResponse fromGeneratedText(Long attemptId, ReviewContext context, String generated) {
-        if (generated == null || generated.isBlank()) {
-            return fallbackReview(attemptId, context);
-        }
-
-        return new AttemptDtos.AiReviewResponse(
-                attemptId,
-                true,
-                generated,
-                topicReviews(context),
-                resources(context),
-                "Выбери одну слабую тему, прочитай ресурс из списка и затем пройди похожий тест повторно."
-        );
     }
 
     private AttemptDtos.AiReviewResponse fallbackReview(Long attemptId, ReviewContext context) {
@@ -269,23 +234,34 @@ public class AiReviewService {
                 .map(entry -> new AttemptDtos.AiTopicReview(
                         entry.getKey(),
                         "Ошибки или точки для повторения связаны с вопросами по этой теме.",
-                        "Разбери пояснение к вопросу и прочитай ресурс из блока resources."
+                        "Разбери корректный ответ и прочитай ресурс из блока resources."
                 ))
                 .toList();
     }
 
     private List<AttemptDtos.AiResource> resources(ReviewContext context) {
         List<AttemptDtos.AiResource> resources = new ArrayList<>();
-        context.byTopic().forEach((topic, items) -> items.stream()
-                .map(AnswerReviewItem::readMoreUrl)
-                .filter(url -> url != null && !url.isBlank())
-                .distinct()
-                .forEach(url -> resources.add(new AttemptDtos.AiResource(
-                        topic,
-                        url,
-                        "Материал поможет повторить тему " + topic
-                ))));
+        context.byTopic().keySet().forEach(topic -> resources.add(new AttemptDtos.AiResource(
+                topic,
+                "https://www.google.com/search?q=" + topic.replace(" ", "+") + "+technical+interview",
+                "Материал поможет повторить тему " + topic
+        )));
         return resources;
+    }
+
+    private String correctAnswer(Question question) {
+        if (question.getType() == QuestionType.SINGLE_CHOICE || question.getType() == QuestionType.MULTIPLE_CHOICE) {
+            return options.findByQuestionIdOrderById(question.getId()).stream()
+                    .filter(QuestionOption::isCorrect)
+                    .map(QuestionOption::getText)
+                    .collect(Collectors.joining(", "));
+        }
+        if (question.getType() == QuestionType.MATCHING) {
+            return pairs.findByQuestionIdOrderById(question.getId()).stream()
+                    .map(pair -> pair.getLeftLabel() + " -> " + pair.getRightLabel())
+                    .collect(Collectors.joining("; "));
+        }
+        return question.getCorrectTextAnswer() == null ? "" : question.getCorrectTextAnswer();
     }
 
     private record ReviewContext(
@@ -301,8 +277,7 @@ public class AiReviewService {
             String topic,
             String prompt,
             String submittedAnswer,
-            String explanation,
-            String readMoreUrl
+            String correctAnswer
     ) {
     }
 }

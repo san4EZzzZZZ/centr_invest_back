@@ -194,10 +194,11 @@ pm.test("answer q1 returns 200", function () {
 
 const json = pm.response.json();
 
-pm.test("q1 is correct and explanation exists", function () {
+pm.test("q1 is correct and generated explanation exists", function () {
   pm.expect(json.correct).to.equal(true);
   pm.expect(json.explanation).to.be.a("string").and.not.empty;
   pm.expect(json.readMoreUrl).to.be.a("string").and.not.empty;
+  pm.expect(json.explanationGeneratedByAi).to.be.a("boolean");
 });
 
 pm.test("next question is q2 multiple choice", function () {
@@ -234,7 +235,7 @@ const json = pm.response.json();
 
 pm.test("q2 is correct", function () {
   pm.expect(json.correct).to.equal(true);
-  pm.expect(json.explanation).to.include("Set");
+  pm.expect(json.explanation).to.be.a("string").and.not.empty;
 });
 
 pm.test("next question is matching", function () {

@@ -22,9 +22,9 @@ public class AttemptDtos {
             boolean correct,
             String explanation,
             String readMoreUrl,
+            boolean explanationGeneratedByAi,
             boolean checkedByAi,
             Double aiConfidence,
-            String aiReason,
             ContentDtos.QuestionResponse nextQuestion,
             ResultResponse result
     ) {
@@ -37,6 +37,7 @@ public class AttemptDtos {
             int totalQuestions,
             List<String> weakTopics,
             String recommendation,
+            AiReviewResponse aiReview,
             Instant completedAt
     ) {
     }

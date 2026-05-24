@@ -22,8 +22,6 @@ public class AdminDtos {
             @NotBlank String topic,
             @NotBlank String prompt,
             String correctTextAnswer,
-            @NotBlank String explanation,
-            @NotBlank String readMoreUrl,
             @Valid List<OptionUpsertRequest> options,
             @Valid List<MatchPairUpsertRequest> matchPairs
     ) {
@@ -64,8 +62,6 @@ public class AdminDtos {
             String topic,
             String prompt,
             String correctTextAnswer,
-            String explanation,
-            String readMoreUrl,
             List<OptionDetailsResponse> options,
             List<MatchPairDetailsResponse> matchPairs
     ) {

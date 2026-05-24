@@ -263,7 +263,7 @@ Short text:
 }
 ```
 
-Ответ backend содержит `correct`, `explanation`, `readMoreUrl`, информацию об AI-проверке короткого ответа, `nextQuestion` или итоговый `result`.
+Ответ backend содержит `correct`, сгенерированные `explanation` и `readMoreUrl`, флаг `explanationGeneratedByAi`, информацию об AI-проверке короткого ответа, `nextQuestion` или итоговый `result` с `aiReview`.
 
 Для `SHORT_TEXT`, если строгая проверка не совпала, backend может дополнительно спросить AI-модель: совпадает ли ответ пользователя по смыслу с эталонным ответом автора вопроса. Это помогает засчитывать ответы с небольшой опечаткой, другой формулировкой или другим языком, если смысл корректный.
 
@@ -274,9 +274,9 @@ Short text:
   "correct": true,
   "explanation": "Для наследования класса используется extends.",
   "readMoreUrl": "https://docs.oracle.com/javase/tutorial/java/IandI/subclasses.html",
+  "explanationGeneratedByAi": true,
   "checkedByAi": true,
   "aiConfidence": 0.91,
-  "aiReason": "Student answer has the same meaning as the expected answer.",
   "nextQuestion": null,
   "result": null
 }
@@ -305,7 +305,7 @@ $env:AI_MODEL="meta/llama-3.1-70b-instruct"
 .\mvnw.cmd spring-boot:run
 ```
 
-Ключ нельзя хардкодить в проект и нельзя коммитить. Если `AI_API_KEY` или `AI_MODEL` не заданы, итоговый AI-разбор вернет fallback, а `SHORT_TEXT` будет проверяться строгим сравнением.
+Ключ нельзя хардкодить в проект и нельзя коммитить. Если `AI_API_KEY` или `AI_MODEL` не заданы, пояснение, ссылка и итоговый AI-разбор вернут fallback, а `SHORT_TEXT` будет проверяться строгим сравнением.
 
 Дополнительные настройки:
 
@@ -416,8 +416,6 @@ Body для создания и редактирования:
       "topic": "HTTP",
       "prompt": "Какой метод используют для чтения ресурса?",
       "correctTextAnswer": null,
-      "explanation": "GET используют для получения ресурса без изменения состояния сервера.",
-      "readMoreUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/GET",
       "options": [
         {
           "text": "GET",
