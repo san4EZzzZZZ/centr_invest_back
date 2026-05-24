@@ -16,6 +16,9 @@ import interview_prep.content.QuestionOptionRepository;
 import interview_prep.content.QuestionRepository;
 import interview_prep.content.QuestionType;
 import interview_prep.profile.FavoriteTestRepository;
+import interview_prep.auth.ForbiddenException;
+import interview_prep.auth.UserAccount;
+import interview_prep.auth.UserRole;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,15 +54,18 @@ public class AdminTestService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminDtos.TestSummaryResponse> list(String title, String language, String profession) {
+    public List<AdminDtos.TestSummaryResponse> list(UserAccount currentUser, String title, String language, String profession) {
         String titleFilter = blankToNull(title);
         String languageFilter = blankToNull(firstPresent(language, profession));
         return findTests(titleFilter, languageFilter).stream()
                 .filter(test -> interview_prep.content.DemoDataInitializer.LANGUAGE_TITLES.contains(test.getProfession().getTitle()))
+                .filter(test -> canManage(currentUser, test))
                 .map(test -> new AdminDtos.TestSummaryResponse(
                         test.getId(),
                         test.getProfession().getId(),
                         test.getProfession().getTitle(),
+                        test.getCreatedBy() == null ? null : test.getCreatedBy().getId(),
+                        test.getCreatedBy() == null ? null : test.getCreatedBy().getEmail(),
                         test.getTitle(),
                         test.getShortDescription(),
                         test.getDescription(),
@@ -69,13 +75,14 @@ public class AdminTestService {
     }
 
     @Transactional(readOnly = true)
-    public AdminDtos.TestDetailsResponse get(Long testId) {
+    public AdminDtos.TestDetailsResponse get(UserAccount currentUser, Long testId) {
         InterviewTest test = findTest(testId);
+        requireCanManage(currentUser, test);
         return toDetails(test);
     }
 
     @Transactional
-    public AdminDtos.TestDetailsResponse create(AdminDtos.TestUpsertRequest request) {
+    public AdminDtos.TestDetailsResponse create(UserAccount currentUser, AdminDtos.TestUpsertRequest request) {
         validate(request);
         Profession profession = professions.findById(request.effectiveLanguageId())
                 .orElseThrow(() -> new EntityNotFoundException("Language not found"));
@@ -83,6 +90,7 @@ public class AdminTestService {
 
         InterviewTest test = tests.save(new InterviewTest(
                 profession,
+                currentUser,
                 request.title().trim(),
                 request.shortDescription().trim(),
                 request.description().trim()
@@ -92,9 +100,10 @@ public class AdminTestService {
     }
 
     @Transactional
-    public AdminDtos.TestDetailsResponse update(Long testId, AdminDtos.TestUpsertRequest request) {
+    public AdminDtos.TestDetailsResponse update(UserAccount currentUser, Long testId, AdminDtos.TestUpsertRequest request) {
         validate(request);
         InterviewTest test = findTest(testId);
+        requireCanManage(currentUser, test);
         Profession profession = professions.findById(request.effectiveLanguageId())
                 .orElseThrow(() -> new EntityNotFoundException("Language not found"));
         ensureSupportedLanguage(profession);
@@ -111,8 +120,9 @@ public class AdminTestService {
     }
 
     @Transactional
-    public void delete(Long testId) {
+    public void delete(UserAccount currentUser, Long testId) {
         InterviewTest test = findTest(testId);
+        requireCanManage(currentUser, test);
         deleteAttempts(testId);
         favorites.deleteByTestId(testId);
         deleteTestQuestions(testId);
@@ -181,6 +191,8 @@ public class AdminTestService {
                 test.getId(),
                 test.getProfession().getId(),
                 test.getProfession().getTitle(),
+                test.getCreatedBy() == null ? null : test.getCreatedBy().getId(),
+                test.getCreatedBy() == null ? null : test.getCreatedBy().getEmail(),
                 test.getTitle(),
                 test.getShortDescription(),
                 test.getDescription(),
@@ -286,6 +298,19 @@ public class AdminTestService {
             return tests.searchByLanguage(language);
         }
         return tests.findAllWithLanguage();
+    }
+
+    private boolean canManage(UserAccount currentUser, InterviewTest test) {
+        if (currentUser.getRole() == UserRole.SUPER_ADMIN) {
+            return true;
+        }
+        return test.getCreatedBy() != null && test.getCreatedBy().getId().equals(currentUser.getId());
+    }
+
+    private void requireCanManage(UserAccount currentUser, InterviewTest test) {
+        if (!canManage(currentUser, test)) {
+            throw new ForbiddenException("You can manage only your own tests");
+        }
     }
 
 }

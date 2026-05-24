@@ -103,13 +103,15 @@ AVATARS_DIR=uploads/avatars
 
 ## Авторизация
 
-При запуске создается тестовый админ:
+При запуске создается тестовый супер-админ:
 
 ```text
 email: admin@example.com
 password: admin123
-role: ADMIN
+role: SUPER_ADMIN
 ```
+
+`SUPER_ADMIN` имеет полный доступ к пользователям и всем тестам. Обычный `ADMIN` создается через выдачу роли супер-админом.
 
 Регистрация теперь двухшаговая: сначала backend отправляет код на почту, а пользователь создается только после подтверждения.
 
@@ -511,11 +513,45 @@ DELETE /api/profile/avatar
 GET /api/profile/avatar/{fileName}
 ```
 
-## Админка
+## Роли И Админка
 
-Все админские ручки требуют `Authorization: Bearer admin-token`, а пользователь должен иметь роль `ADMIN`.
+Роли:
+
+```text
+USER - обычный пользователь
+ADMIN - создает тесты и управляет только своими тестами
+SUPER_ADMIN - управляет пользователями и любыми тестами
+```
+
+Все админские ручки требуют `Authorization: Bearer admin-token`, а пользователь должен иметь роль `ADMIN` или `SUPER_ADMIN`.
 
 Без токена будет `401`, с обычным user-токеном будет `403`.
+
+Пользователи доступны только супер-админу:
+
+```http
+GET /api/admin/users
+GET /api/admin/users?search=student
+Authorization: Bearer super-admin-token
+```
+
+Изменить пользователя, выдать или забрать роль обычного админа:
+
+```http
+PATCH /api/admin/users/{userId}
+Authorization: Bearer super-admin-token
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "admin-user@example.com",
+  "username": "Admin User",
+  "role": "ADMIN"
+}
+```
+
+Через эту ручку нельзя выдать `SUPER_ADMIN` и нельзя редактировать супер-админа.
 
 Список тестов:
 
@@ -523,6 +559,8 @@ GET /api/profile/avatar/{fileName}
 GET /api/admin/tests
 Authorization: Bearer admin-token
 ```
+
+`SUPER_ADMIN` видит все тесты. `ADMIN` видит только тесты, где он указан как создатель.
 
 Поиск в админке:
 
@@ -626,7 +664,7 @@ SHORT_TEXT - нужен correctTextAnswer
 ```text
 400 Bad Request - неверный body или нарушение правил прохождения
 401 Unauthorized - нет токена или неверный логин/пароль
-403 Forbidden - пользователь не админ для /api/admin
+403 Forbidden - пользователь не имеет нужной роли или пытается управлять чужими тестами
 404 Not Found - сущность не найдена
 ```
 
@@ -637,7 +675,7 @@ export type CurrentUser = {
   id: number;
   email: string;
   username: string;
-  role: "USER" | "ADMIN";
+  role: "USER" | "ADMIN" | "SUPER_ADMIN";
   avatarUrl: string | null;
 };
 

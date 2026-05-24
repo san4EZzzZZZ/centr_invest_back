@@ -10,8 +10,16 @@ import org.springframework.stereotype.Component;
 public class AdminGuard {
     public UserAccount requireAdmin() {
         UserAccount user = CurrentUserContext.getRequired();
-        if (user.getRole() != UserRole.ADMIN) {
+        if (user.getRole() != UserRole.ADMIN && user.getRole() != UserRole.SUPER_ADMIN) {
             throw new ForbiddenException("Admin role required");
+        }
+        return user;
+    }
+
+    public UserAccount requireSuperAdmin() {
+        UserAccount user = CurrentUserContext.getRequired();
+        if (user.getRole() != UserRole.SUPER_ADMIN) {
+            throw new ForbiddenException("Super admin role required");
         }
         return user;
     }

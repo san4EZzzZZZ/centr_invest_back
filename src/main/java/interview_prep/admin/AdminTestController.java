@@ -28,32 +28,28 @@ public class AdminTestController {
     public List<AdminDtos.TestSummaryResponse> list(@RequestParam(required = false) String title,
                                                     @RequestParam(required = false) String language,
                                                     @RequestParam(required = false) String profession) {
-        adminGuard.requireAdmin();
-        return adminTestService.list(title, language, profession);
+        return adminTestService.list(adminGuard.requireAdmin(), title, language, profession);
     }
 
     @GetMapping("/{testId}")
     public AdminDtos.TestDetailsResponse get(@PathVariable Long testId) {
-        adminGuard.requireAdmin();
-        return adminTestService.get(testId);
+        return adminTestService.get(adminGuard.requireAdmin(), testId);
     }
 
     @PostMapping
     public AdminDtos.TestDetailsResponse create(@Valid @RequestBody AdminDtos.TestUpsertRequest request) {
-        adminGuard.requireAdmin();
-        return adminTestService.create(request);
+        return adminTestService.create(adminGuard.requireAdmin(), request);
     }
 
     @PutMapping("/{testId}")
     public AdminDtos.TestDetailsResponse update(@PathVariable Long testId,
                                                 @Valid @RequestBody AdminDtos.TestUpsertRequest request) {
         adminGuard.requireAdmin();
-        return adminTestService.update(testId, request);
+        return adminTestService.update(adminGuard.requireAdmin(), testId, request);
     }
 
     @DeleteMapping("/{testId}")
     public void delete(@PathVariable Long testId) {
-        adminGuard.requireAdmin();
-        adminTestService.delete(testId);
+        adminTestService.delete(adminGuard.requireAdmin(), testId);
     }
 }

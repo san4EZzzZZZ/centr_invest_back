@@ -4,12 +4,12 @@ Base URL: `http://localhost:8080/api`
 
 ## Auth
 
-Seeded admin account:
+Seeded super admin account:
 
 ```text
 email: admin@example.com
 password: admin123
-role: ADMIN
+role: SUPER_ADMIN
 ```
 
 `POST /auth/register`
@@ -357,6 +357,44 @@ Adds a test to favorites.
 
 Removes a test from favorites.
 
+## Admin Roles
+
+Roles:
+
+```text
+USER
+ADMIN
+SUPER_ADMIN
+```
+
+`SUPER_ADMIN` can view/search users, edit user email/name, grant or revoke the regular `ADMIN` role, and manage any test.
+
+`ADMIN` can create tests and can view, update, or delete only tests created by this admin.
+
+## Admin Users
+
+Super admin only.
+
+`GET /admin/users`
+
+Returns all users.
+
+`GET /admin/users?search=student`
+
+Searches by email or username substring.
+
+`PATCH /admin/users/{userId}`
+
+```json
+{
+  "email": "admin-user@example.com",
+  "username": "Admin User",
+  "role": "ADMIN"
+}
+```
+
+Allowed roles in this endpoint: `USER`, `ADMIN`. It cannot grant `SUPER_ADMIN` and cannot edit a super admin.
+
 ## Admin Tests
 
 All admin endpoints require:
@@ -365,11 +403,11 @@ All admin endpoints require:
 Authorization: Bearer admin-token
 ```
 
-The token must belong to a user with `role = ADMIN`.
+The token must belong to a user with `role = ADMIN` or `SUPER_ADMIN`.
 
 `GET /admin/tests`
 
-Returns all tests with language info and question counts.
+Returns tests with language info, creator info, and question counts. `SUPER_ADMIN` receives all tests, `ADMIN` receives only own tests.
 
 Optional case-insensitive substring search:
 

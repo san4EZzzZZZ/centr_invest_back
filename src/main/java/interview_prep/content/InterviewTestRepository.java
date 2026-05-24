@@ -11,6 +11,8 @@ public interface InterviewTestRepository extends JpaRepository<InterviewTest, Lo
 
     long countByProfessionId(Long professionId);
 
+    List<InterviewTest> findByCreatedById(Long createdById);
+
     @Query("""
             select test from InterviewTest test
             join fetch test.profession profession

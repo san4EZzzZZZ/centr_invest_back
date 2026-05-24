@@ -4,6 +4,7 @@ import interview_prep.auth.UserAccount;
 import interview_prep.auth.UserAccountRepository;
 import interview_prep.auth.UserRole;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@Order(1)
 public class DemoDataInitializer implements CommandLineRunner {
     public static final List<String> LANGUAGE_TITLES = List.of(
             "Python",
@@ -57,10 +59,11 @@ public class DemoDataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        seedAdmin();
+        UserAccount superAdmin = seedSuperAdmin();
         seedLanguages();
         migrateLegacyJavaProfession();
-        seedJavaDemoTest();
+        assignLegacyTestsToSuperAdmin(superAdmin);
+        seedJavaDemoTest(superAdmin);
     }
 
     private void seedLanguages() {
@@ -92,7 +95,7 @@ public class DemoDataInitializer implements CommandLineRunner {
         });
     }
 
-    private void seedJavaDemoTest() {
+    private void seedJavaDemoTest(UserAccount superAdmin) {
         Profession java = professions.findByTitle("Java")
                 .orElseThrow(() -> new IllegalStateException("Java language category was not seeded"));
 
@@ -101,6 +104,7 @@ public class DemoDataInitializer implements CommandLineRunner {
                 .findFirst()
                 .orElseGet(() -> tests.save(new InterviewTest(
                         java,
+                        superAdmin,
                         "Junior Java Backend-разработчик",
                         "Базовая проверка Java backend: HTTP, Java Core, SQL, JPA, Spring и REST.",
                         "Пул вопросов для подготовки к junior Java backend собеседованию. При старте попытки сервер выбирает до 7 вопросов нужных типов из пула этого теста."
@@ -174,16 +178,29 @@ public class DemoDataInitializer implements CommandLineRunner {
                 });
     }
 
-    private void seedAdmin() {
-        if (users.existsByEmailIgnoreCase("admin@example.com")) {
-            return;
-        }
+    private void assignLegacyTestsToSuperAdmin(UserAccount superAdmin) {
+        tests.findAll().stream()
+                .filter(test -> test.getCreatedBy() == null)
+                .forEach(test -> {
+                    test.setCreatedBy(superAdmin);
+                    tests.save(test);
+                });
+    }
 
-        users.save(new UserAccount(
-                "admin@example.com",
-                "Admin",
-                passwordEncoder.encode("admin123"),
-                UserRole.ADMIN
-        ));
+    private UserAccount seedSuperAdmin() {
+        return users.findByEmailIgnoreCase("admin@example.com")
+                .map(user -> {
+                    if (user.getRole() != UserRole.SUPER_ADMIN) {
+                        user.setRole(UserRole.SUPER_ADMIN);
+                        return users.save(user);
+                    }
+                    return user;
+                })
+                .orElseGet(() -> users.save(new UserAccount(
+                        "admin@example.com",
+                        "Admin",
+                        passwordEncoder.encode("admin123"),
+                        UserRole.SUPER_ADMIN
+                )));
     }
 }

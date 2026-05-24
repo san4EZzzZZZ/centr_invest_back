@@ -1,5 +1,6 @@
 package interview_prep.content;
 
+import interview_prep.auth.UserAccount;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -23,6 +24,9 @@ public class InterviewTest {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     private Profession profession;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    private UserAccount createdBy;
+
     @Column(nullable = false)
     private String title;
 
@@ -37,5 +41,10 @@ public class InterviewTest {
         this.title = title;
         this.shortDescription = shortDescription;
         this.description = description;
+    }
+
+    public InterviewTest(Profession profession, UserAccount createdBy, String title, String shortDescription, String description) {
+        this(profession, title, shortDescription, description);
+        this.createdBy = createdBy;
     }
 }
