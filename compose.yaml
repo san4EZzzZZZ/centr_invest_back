@@ -32,7 +32,8 @@ services:
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       - MAIL_FROM=${MAIL_FROM}
       - MAIL_SMTP_AUTH=${MAIL_SMTP_AUTH:-true}
-      - MAIL_SMTP_STARTTLS=${MAIL_SMTP_STARTTLS:-true}
+      - MAIL_SMTP_STARTTLS=${MAIL_SMTP_STARTTLS:-false}
+      - MAIL_SMTP_SSL_ENABLE=${MAIL_SSL_ENABLE:-true}
     depends_on:
       postgres:
         condition: service_healthy
