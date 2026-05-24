@@ -25,6 +25,8 @@ app:
       base-url: ${AI_BASE_URL:https://integrate.api.nvidia.com/v1}
       api-key: ${AI_API_KEY:${OPENAI_API_KEY:}}
       model: ${AI_MODEL:${OPENAI_MODEL:meta/llama-3.1-70b-instruct}}
+      connect-timeout: ${AI_CONNECT_TIMEOUT:5s}
+      read-timeout: ${AI_READ_TIMEOUT:30s}
     answer-check:
       enabled: ${AI_ANSWER_CHECK_ENABLED:true}
       min-confidence: ${AI_ANSWER_CHECK_MIN_CONFIDENCE:0.75}

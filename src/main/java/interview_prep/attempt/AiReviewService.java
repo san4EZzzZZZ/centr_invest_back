@@ -8,12 +8,15 @@ import interview_prep.content.QuestionOption;
 import interview_prep.content.QuestionOptionRepository;
 import interview_prep.content.QuestionType;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +26,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class AiReviewService {
+    private static final Logger log = LoggerFactory.getLogger(AiReviewService.class);
+
     private final TestAttemptRepository attempts;
     private final AttemptAnswerRepository answers;
     private final QuestionOptionRepository options;
@@ -35,18 +40,19 @@ public class AiReviewService {
                            AttemptAnswerRepository answers,
                            QuestionOptionRepository options,
                            MatchPairRepository pairs,
+                           AiRestClientFactory restClientFactory,
                            @Value("${app.ai.openai.base-url}") String baseUrl,
                            @Value("${app.ai.openai.api-key:}") String apiKey,
-                           @Value("${app.ai.openai.model:}") String model) {
+                           @Value("${app.ai.openai.model:}") String model,
+                           @Value("${app.ai.openai.connect-timeout:5s}") Duration connectTimeout,
+                           @Value("${app.ai.openai.read-timeout:30s}") Duration readTimeout) {
         this.attempts = attempts;
         this.answers = answers;
         this.options = options;
         this.pairs = pairs;
         this.apiKey = apiKey;
         this.model = model;
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .build();
+        this.restClient = restClientFactory.create(baseUrl, connectTimeout, readTimeout);
     }
 
     @Transactional(readOnly = true)
@@ -71,8 +77,8 @@ public class AiReviewService {
                         "Выбери одну слабую тему, прочитай ресурс из списка и затем пройди похожий тест повторно."
                 );
             }
-        } catch (RuntimeException ignored) {
-            // Fallback keeps result endpoints available even if the provider is temporarily unavailable.
+        } catch (RuntimeException exception) {
+            log.warn("AI final review generation failed, fallback will be used: {}", exception.getMessage());
         }
         return fallbackReview(attemptId, context);
     }

@@ -6,17 +6,22 @@ import interview_prep.content.Question;
 import interview_prep.content.QuestionOption;
 import interview_prep.content.QuestionOptionRepository;
 import interview_prep.content.QuestionType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 public class AiExplanationService {
+    private static final Logger log = LoggerFactory.getLogger(AiExplanationService.class);
+
     private final QuestionOptionRepository options;
     private final MatchPairRepository pairs;
     private final RestClient restClient;
@@ -25,14 +30,15 @@ public class AiExplanationService {
 
     public AiExplanationService(QuestionOptionRepository options,
                                 MatchPairRepository pairs,
+                                AiRestClientFactory restClientFactory,
                                 @Value("${app.ai.openai.base-url}") String baseUrl,
                                 @Value("${app.ai.openai.api-key:}") String apiKey,
-                                @Value("${app.ai.openai.model:}") String model) {
+                                @Value("${app.ai.openai.model:}") String model,
+                                @Value("${app.ai.openai.connect-timeout:5s}") Duration connectTimeout,
+                                @Value("${app.ai.openai.read-timeout:30s}") Duration readTimeout) {
         this.options = options;
         this.pairs = pairs;
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .build();
+        this.restClient = restClientFactory.create(baseUrl, connectTimeout, readTimeout);
         this.apiKey = apiKey;
         this.model = model;
     }
@@ -47,8 +53,8 @@ public class AiExplanationService {
             if (!generated.explanation().isBlank() && !generated.readMoreUrl().isBlank()) {
                 return generated;
             }
-        } catch (RuntimeException ignored) {
-            // Fallback keeps the answer endpoint stable when the provider is unavailable.
+        } catch (RuntimeException exception) {
+            log.warn("AI explanation generation failed, fallback will be used: {}", exception.getMessage());
         }
         return fallback(question, correct);
     }

@@ -302,10 +302,12 @@ AI-функции используют OpenAI-compatible API. Сейчас по 
 $env:AI_BASE_URL="https://integrate.api.nvidia.com/v1"
 $env:AI_API_KEY="your_api_key"
 $env:AI_MODEL="meta/llama-3.1-70b-instruct"
+$env:AI_CONNECT_TIMEOUT="5s"
+$env:AI_READ_TIMEOUT="30s"
 .\mvnw.cmd spring-boot:run
 ```
 
-Ключ нельзя хардкодить в проект и нельзя коммитить. Если `AI_API_KEY` или `AI_MODEL` не заданы, пояснение, ссылка и итоговый AI-разбор вернут fallback, а `SHORT_TEXT` будет проверяться строгим сравнением.
+Ключ нельзя хардкодить в проект и нельзя коммитить. Если `AI_API_KEY` или `AI_MODEL` не заданы, пояснение, ссылка и итоговый AI-разбор вернут fallback, а `SHORT_TEXT` будет проверяться строгим сравнением. Если провайдер долго не отвечает, backend ждет не бесконечно, а до `AI_READ_TIMEOUT`, пишет предупреждение в лог и возвращает fallback.
 
 Дополнительные настройки:
 

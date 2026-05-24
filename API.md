@@ -190,6 +190,8 @@ Environment variables:
 AI_BASE_URL=https://integrate.api.nvidia.com/v1
 AI_API_KEY=your_api_key
 AI_MODEL=meta/llama-3.1-70b-instruct
+AI_CONNECT_TIMEOUT=5s
+AI_READ_TIMEOUT=30s
 AI_ANSWER_CHECK_ENABLED=true
 AI_ANSWER_CHECK_MIN_CONFIDENCE=0.75
 ```

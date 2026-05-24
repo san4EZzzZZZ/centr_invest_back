@@ -1,31 +1,37 @@
 package interview_prep.attempt;
 
 import interview_prep.content.Question;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.text.Normalizer;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class ShortTextAnswerReviewService {
+    private static final Logger log = LoggerFactory.getLogger(ShortTextAnswerReviewService.class);
+
     private final RestClient restClient;
     private final String apiKey;
     private final String model;
     private final boolean enabled;
     private final double minConfidence;
 
-    public ShortTextAnswerReviewService(@Value("${app.ai.openai.base-url}") String baseUrl,
+    public ShortTextAnswerReviewService(AiRestClientFactory restClientFactory,
+                                        @Value("${app.ai.openai.base-url}") String baseUrl,
                                         @Value("${app.ai.openai.api-key:}") String apiKey,
                                         @Value("${app.ai.openai.model:}") String model,
                                         @Value("${app.ai.answer-check.enabled:true}") boolean enabled,
-                                        @Value("${app.ai.answer-check.min-confidence:0.75}") double minConfidence) {
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .build();
+                                        @Value("${app.ai.answer-check.min-confidence:0.75}") double minConfidence,
+                                        @Value("${app.ai.openai.connect-timeout:5s}") Duration connectTimeout,
+                                        @Value("${app.ai.openai.read-timeout:30s}") Duration readTimeout) {
+        this.restClient = restClientFactory.create(baseUrl, connectTimeout, readTimeout);
         this.apiKey = apiKey;
         this.model = model;
         this.enabled = enabled;
@@ -46,6 +52,7 @@ public class ShortTextAnswerReviewService {
             boolean accepted = decision.correct() && decision.confidence() >= minConfidence;
             return new Evaluation(accepted, true, decision.confidence(), decision.reason());
         } catch (RuntimeException exception) {
+            log.warn("AI short text answer check failed, strict check will be used: {}", exception.getMessage());
             return new Evaluation(false, false, 0.0, "AI answer check failed, strict check was used");
         }
     }
