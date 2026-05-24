@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 
 @RestController
@@ -55,9 +56,20 @@ public class ProfileController {
 
     @GetMapping("/favorites")
     @Transactional(readOnly = true)
-    public List<FavoriteTestResponse> favorites() {
+    public List<FavoriteTestResponse> favorites(@RequestParam(required = false) String title,
+                                                @RequestParam(required = false) String language,
+                                                @RequestParam(defaultValue = "0") int page,
+                                                @RequestParam(defaultValue = "20") int size,
+                                                @RequestParam(defaultValue = "addedAtDesc") String sort) {
         UserAccount user = CurrentUserContext.getRequired();
-        return favoriteResponses(user.getId());
+        return favoriteResponses(user.getId(), title, language, page, size, sort);
+    }
+
+    @GetMapping("/completed-tests")
+    @Transactional(readOnly = true)
+    public List<AttemptDtos.CompletedTestResponse> completedTests() {
+        UserAccount user = CurrentUserContext.getRequired();
+        return attemptService.completedTests(user.getId());
     }
 
     @PatchMapping("/name")
@@ -127,6 +139,25 @@ public class ProfileController {
                 .toList();
     }
 
+    private List<FavoriteTestResponse> favoriteResponses(Long userId, String title, String language, int page, int size,
+                                                         String sort) {
+        String titleFilter = blankToNull(title);
+        String languageFilter = blankToNull(language);
+        List<FavoriteTest> foundFavorites = titleFilter == null && languageFilter == null
+                ? favorites.findByUserIdOrderByCreatedAtDesc(userId)
+                : favorites.searchByUserId(userId, titleFilter, languageFilter);
+        return foundFavorites.stream()
+                .sorted(favoriteComparator(sort))
+                .skip(offset(page, size))
+                .limit(normalizedSize(size))
+                .map(this::toFavoriteResponse)
+                .toList();
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
+    }
+
     private FavoriteTestResponse toFavoriteResponse(FavoriteTest favorite) {
         InterviewTest test = favorite.getTest();
         return new FavoriteTestResponse(
@@ -146,6 +177,34 @@ public class ProfileController {
 
     public record FavoriteTestResponse(Long testId, Long languageId, String languageTitle, String testTitle,
                                        String testShortDescription, String testDescription, Instant addedAt) {
+    }
+
+    private Comparator<FavoriteTest> favoriteComparator(String sort) {
+        Comparator<FavoriteTest> byAddedAt = Comparator.comparing(FavoriteTest::getCreatedAt);
+        Comparator<FavoriteTest> byTitle = Comparator.comparing(
+                favorite -> favorite.getTest().getTitle(),
+                String.CASE_INSENSITIVE_ORDER
+        );
+        Comparator<FavoriteTest> byLanguage = Comparator.comparing(
+                favorite -> favorite.getTest().getProfession().getTitle(),
+                String.CASE_INSENSITIVE_ORDER
+        );
+        return switch (sort == null ? "" : sort) {
+            case "addedAtAsc" -> byAddedAt;
+            case "titleAsc" -> byTitle.thenComparing(byAddedAt.reversed());
+            case "titleDesc" -> byTitle.reversed().thenComparing(byAddedAt.reversed());
+            case "languageAsc" -> byLanguage.thenComparing(byTitle);
+            case "languageDesc" -> byLanguage.reversed().thenComparing(byTitle);
+            default -> byAddedAt.reversed();
+        };
+    }
+
+    private long offset(int page, int size) {
+        return (long) Math.max(0, page) * normalizedSize(size);
+    }
+
+    private int normalizedSize(int size) {
+        return Math.min(Math.max(size, 1), 100);
     }
 
     private MediaType mediaType(String fileName) {

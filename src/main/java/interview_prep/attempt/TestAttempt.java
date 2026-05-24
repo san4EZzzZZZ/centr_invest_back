@@ -50,6 +50,8 @@ public class TestAttempt {
 
     private Instant completedAt;
 
+    private Long durationSeconds;
+
     public TestAttempt(UserAccount user, InterviewTest test, int totalQuestions) {
         this.user = user;
         this.test = test;

@@ -250,6 +250,17 @@ title - часть названия теста
 language - часть названия языка
 ```
 
+Если передать `Authorization: Bearer token`, у тестов в каталоге будет корректный флаг `favorite`. Без токена `favorite` всегда `false`.
+
+Для списков тестов поддерживается сортировка:
+
+```text
+sort=titleAsc
+sort=titleDesc
+sort=questionCountAsc
+sort=questionCountDesc
+```
+
 Временная обратная совместимость: `GET /api/professions` и параметр `profession` пока тоже работают, но фронту лучше использовать `/api/languages` и `language`.
 
 Пример теста в ответе:
@@ -268,6 +279,41 @@ language - часть названия языка
 
 ```http
 GET /api/tests/{testId}
+```
+
+Получить все тесты конкретного языка:
+
+```http
+GET /api/languages/{languageId}/tests
+```
+
+Можно сразу искать по части названия теста внутри этого языка:
+
+```http
+GET /api/languages/{languageId}/tests?title=backend
+```
+
+Эта ручка поддерживает пагинацию и сортировку:
+
+```http
+GET /api/languages/{languageId}/tests?page=0&size=20&sort=titleAsc
+```
+
+`page` начинается с `0`, `size` по умолчанию `20`, максимум `100`.
+
+Ответ - массив `TestSummary`:
+
+```json
+[
+  {
+    "id": 1,
+    "title": "Java Backend: базовое собеседование",
+    "shortDescription": "Короткая проверка базы Java backend.",
+    "description": "7 вопросов разных типов.",
+    "questionCount": 7,
+    "favorite": true
+  }
+]
 ```
 
 Current implementation: this endpoint returns metadata and the question pool of this exact test. Correct answers are still hidden from public clients.
@@ -370,11 +416,38 @@ Short text:
 }
 ```
 
+Таймер попытки начинается на `POST /api/tests/{testId}/attempts` и заканчивается, когда пользователь отвечает на последний вопрос. В итоговом ответе backend возвращает:
+
+```text
+duration - время текущего прохождения
+bestTime - лучшее время пользователя по этому тесту среди завершенных попыток
+```
+
+Формат времени: `HH.MM.SS`, например `00.03.42`.
+
 Итог:
 
 ```http
 GET /api/attempts/{attemptId}/result
 Authorization: Bearer token
+```
+
+Пример результата:
+
+```json
+{
+  "attemptId": 10,
+  "testId": 1,
+  "testTitle": "Java Backend: базовое собеседование",
+  "correctAnswers": 6,
+  "totalQuestions": 7,
+  "duration": "00.03.42",
+  "bestTime": "00.03.42",
+  "weakTopics": ["SQL"],
+  "recommendation": "Повтори темы: SQL",
+  "aiReview": null,
+  "completedAt": "2026-05-24T14:40:00Z"
+}
 ```
 
 AI-разбор и AI-проверка коротких ответов:
@@ -415,7 +488,32 @@ GET /api/profile
 Authorization: Bearer token
 ```
 
-В ответе есть пользователь, последние завершенные попытки и избранные тесты.
+В ответе есть пользователь, последние 5 завершенных попыток в `recentAttempts` и избранные тесты в `favoriteTests`.
+
+У `recentAttempts` есть время прохождения и лучшее время:
+
+```json
+{
+  "attemptId": 10,
+  "testId": 1,
+  "languageTitle": "Java",
+  "testTitle": "Java Backend: базовое собеседование",
+  "correctAnswers": 6,
+  "totalQuestions": 7,
+  "duration": "00.03.42",
+  "bestTime": "00.03.42",
+  "completedAt": "2026-05-24T14:40:00Z"
+}
+```
+
+Полный список пройденных тестов:
+
+```http
+GET /api/profile/completed-tests
+Authorization: Bearer token
+```
+
+Ответ - массив таких же элементов, как `recentAttempts`, но без ограничения в 5 записей. Его удобно использовать для отдельного экрана истории прохождений.
 
 Избранное:
 
@@ -425,6 +523,35 @@ POST /api/profile/favorites/tests/{testId}
 DELETE /api/profile/favorites/tests/{testId}
 Authorization: Bearer token
 ```
+
+Поиск по избранному:
+
+```http
+GET /api/profile/favorites?title=backend&language=java
+Authorization: Bearer token
+```
+
+Параметры `title` и `language` необязательные, поиск идет по части строки без учета регистра.
+
+Также поддерживаются пагинация и сортировка:
+
+```http
+GET /api/profile/favorites?page=0&size=20&sort=addedAtDesc
+Authorization: Bearer token
+```
+
+Варианты `sort`:
+
+```text
+addedAtDesc
+addedAtAsc
+titleAsc
+titleDesc
+languageAsc
+languageDesc
+```
+
+`page` начинается с `0`, `size` по умолчанию `20`, максимум `100`.
 
 Элемент избранного содержит:
 
@@ -685,6 +812,7 @@ export type TestSummary = {
   shortDescription: string;
   description: string;
   questionCount: number;
+  favorite: boolean;
 };
 
 export type FavoriteTest = {
@@ -695,6 +823,18 @@ export type FavoriteTest = {
   testShortDescription: string;
   testDescription: string;
   addedAt: string;
+};
+
+export type CompletedTest = {
+  attemptId: number;
+  testId: number;
+  languageTitle: string;
+  testTitle: string;
+  correctAnswers: number;
+  totalQuestions: number;
+  duration: string;
+  bestTime: string;
+  completedAt: string;
 };
 ```
 

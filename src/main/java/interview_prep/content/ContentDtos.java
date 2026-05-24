@@ -6,7 +6,8 @@ public class ContentDtos {
     public record LanguageResponse(Long id, String title, String description, List<TestSummary> tests) {
     }
 
-    public record TestSummary(Long id, String title, String shortDescription, String description, int questionCount) {
+    public record TestSummary(Long id, String title, String shortDescription, String description, int questionCount,
+                              boolean favorite) {
     }
 
     public record TestResponse(Long id, Long languageId, String title, String shortDescription, String description,

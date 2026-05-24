@@ -7,6 +7,10 @@ import java.util.List;
 public interface TestAttemptRepository extends JpaRepository<TestAttempt, Long> {
     List<TestAttempt> findTop5ByUserIdAndStatusOrderByStartedAtDesc(Long userId, AttemptStatus status);
 
+    List<TestAttempt> findByUserIdAndStatusOrderByCompletedAtDesc(Long userId, AttemptStatus status);
+
+    List<TestAttempt> findByUserIdAndTestIdAndStatus(Long userId, Long testId, AttemptStatus status);
+
     List<TestAttempt> findByTestId(Long testId);
 
     void deleteByTestId(Long testId);

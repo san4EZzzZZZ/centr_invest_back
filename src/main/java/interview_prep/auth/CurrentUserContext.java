@@ -18,6 +18,10 @@ public final class CurrentUserContext {
         return user;
     }
 
+    public static UserAccount get() {
+        return CURRENT.get();
+    }
+
     public static void clear() {
         CURRENT.remove();
     }

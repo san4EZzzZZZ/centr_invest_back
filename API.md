@@ -123,7 +123,51 @@ GET /languages?title=backend&language=java
 
 `title` filters by part of the test title. `language` filters by part of the language title.
 
+If a valid `Authorization: Bearer token` header is sent, test summaries include the real `favorite` flag for the current user. Without auth, `favorite` is always `false`.
+
+Supported catalog sort values:
+
+```text
+titleAsc
+titleDesc
+questionCountAsc
+questionCountDesc
+```
+
 Temporary compatibility alias: `GET /professions` and query parameter `profession` still work, but frontend should use `/languages` and `language`.
+
+`GET /languages/{languageId}/tests`
+
+Returns all tests for a specific language.
+
+Optional case-insensitive substring search inside this language:
+
+```text
+GET /languages/{languageId}/tests?title=backend
+```
+
+Pagination and sorting:
+
+```text
+GET /languages/{languageId}/tests?page=0&size=20&sort=titleAsc
+```
+
+`page` starts from `0`. Default `size` is `20`, maximum `100`.
+
+Response:
+
+```json
+[
+  {
+    "id": 1,
+    "title": "Java Backend: базовое собеседование",
+    "shortDescription": "Короткая проверка базы Java backend.",
+    "description": "7 вопросов разных типов.",
+    "questionCount": 7,
+    "favorite": true
+  }
+]
+```
 
 `GET /tests/{testId}`
 
@@ -211,7 +255,27 @@ Example answer response fragment:
 
 `GET /attempts/{attemptId}/result`
 
-Returns final score, weak topics, recommendation, and generated `aiReview`. Available after completion.
+Returns final score, attempt duration, best user time for this test, weak topics, recommendation, and generated `aiReview`. Available after completion.
+
+Time fields use `HH.MM.SS`, for example `00.03.42`.
+
+Example:
+
+```json
+{
+  "attemptId": 10,
+  "testId": 1,
+  "testTitle": "Java Backend: базовое собеседование",
+  "correctAnswers": 6,
+  "totalQuestions": 7,
+  "duration": "00.03.42",
+  "bestTime": "00.03.42",
+  "weakTopics": ["SQL"],
+  "recommendation": "Повтори темы: SQL",
+  "aiReview": null,
+  "completedAt": "2026-05-24T14:40:00Z"
+}
+```
 
 `GET /attempts/{attemptId}/ai-review`
 
@@ -267,7 +331,7 @@ AI_ANSWER_CHECK_MIN_CONFIDENCE=0.75
 
 `GET /profile`
 
-Returns the current user, 5 latest completed attempts, and favorite tests.
+Returns the current user, 5 latest completed attempts in `recentAttempts`, and favorite tests in `favoriteTests`.
 
 Current user includes `avatarUrl`:
 
@@ -278,6 +342,22 @@ Current user includes `avatarUrl`:
   "username": "Student",
   "role": "USER",
   "avatarUrl": "/api/profile/avatar/uuid.png"
+}
+```
+
+Recent attempt item:
+
+```json
+{
+  "attemptId": 10,
+  "testId": 1,
+  "languageTitle": "Java",
+  "testTitle": "Java Backend: базовое собеседование",
+  "correctAnswers": 6,
+  "totalQuestions": 7,
+  "duration": "00.03.42",
+  "bestTime": "00.03.42",
+  "completedAt": "2026-05-24T14:40:00Z"
 }
 ```
 
@@ -348,6 +428,37 @@ Returns avatar image by `avatarUrl`.
 `GET /profile/favorites`
 
 Returns only favorite tests.
+
+Optional case-insensitive substring search:
+
+```text
+GET /profile/favorites?title=backend&language=java
+```
+
+`title` searches by part of the test title. `language` searches by part of the language title.
+
+Pagination and sorting:
+
+```text
+GET /profile/favorites?page=0&size=20&sort=addedAtDesc
+```
+
+Supported favorite sort values:
+
+```text
+addedAtDesc
+addedAtAsc
+titleAsc
+titleDesc
+languageAsc
+languageDesc
+```
+
+`page` starts from `0`. Default `size` is `20`, maximum `100`.
+
+`GET /profile/completed-tests`
+
+Returns all completed tests for the current user. Items have the same shape as `recentAttempts`, but the list is not limited to 5 records.
 
 `POST /profile/favorites/tests/{testId}`
 

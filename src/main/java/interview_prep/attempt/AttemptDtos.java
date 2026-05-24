@@ -32,9 +32,12 @@ public class AttemptDtos {
 
     public record ResultResponse(
             Long attemptId,
+            Long testId,
             String testTitle,
             int correctAnswers,
             int totalQuestions,
+            String duration,
+            String bestTime,
             List<String> weakTopics,
             String recommendation,
             AiReviewResponse aiReview,
@@ -44,10 +47,26 @@ public class AttemptDtos {
 
     public record RecentAttemptResponse(
             Long attemptId,
+            Long testId,
             String languageTitle,
             String testTitle,
             int correctAnswers,
             int totalQuestions,
+            String duration,
+            String bestTime,
+            Instant completedAt
+    ) {
+    }
+
+    public record CompletedTestResponse(
+            Long attemptId,
+            Long testId,
+            String languageTitle,
+            String testTitle,
+            int correctAnswers,
+            int totalQuestions,
+            String duration,
+            String bestTime,
             Instant completedAt
     ) {
     }

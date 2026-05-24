@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -125,6 +126,7 @@ public class AttemptService {
         if (attempt.getCurrentPosition() >= attempt.getTotalQuestions()) {
             attempt.setStatus(AttemptStatus.COMPLETED);
             attempt.setCompletedAt(Instant.now());
+            attempt.setDurationSeconds(Duration.between(attempt.getStartedAt(), attempt.getCompletedAt()).toSeconds());
             result = result(attempt);
         } else {
             attempt.setCurrentPosition(attempt.getCurrentPosition() + 1);
@@ -157,10 +159,30 @@ public class AttemptService {
         return attempts.findTop5ByUserIdAndStatusOrderByStartedAtDesc(userId, AttemptStatus.COMPLETED).stream()
                 .map(attempt -> new AttemptDtos.RecentAttemptResponse(
                         attempt.getId(),
+                        attempt.getTest().getId(),
                         attempt.getTest().getProfession().getTitle(),
                         attempt.getTest().getTitle(),
                         attempt.getCorrectAnswers(),
                         attempt.getTotalQuestions(),
+                        formatDuration(durationSeconds(attempt)),
+                        formatDuration(bestDurationSeconds(attempt.getUser().getId(), attempt.getTest().getId())),
+                        attempt.getCompletedAt()
+                ))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AttemptDtos.CompletedTestResponse> completedTests(Long userId) {
+        return attempts.findByUserIdAndStatusOrderByCompletedAtDesc(userId, AttemptStatus.COMPLETED).stream()
+                .map(attempt -> new AttemptDtos.CompletedTestResponse(
+                        attempt.getId(),
+                        attempt.getTest().getId(),
+                        attempt.getTest().getProfession().getTitle(),
+                        attempt.getTest().getTitle(),
+                        attempt.getCorrectAnswers(),
+                        attempt.getTotalQuestions(),
+                        formatDuration(durationSeconds(attempt)),
+                        formatDuration(bestDurationSeconds(userId, attempt.getTest().getId())),
                         attempt.getCompletedAt()
                 ))
                 .toList();
@@ -237,9 +259,12 @@ public class AttemptService {
 
         return new AttemptDtos.ResultResponse(
                 attempt.getId(),
+                attempt.getTest().getId(),
                 attempt.getTest().getTitle(),
                 attempt.getCorrectAnswers(),
                 attempt.getTotalQuestions(),
+                formatDuration(durationSeconds(attempt)),
+                formatDuration(bestDurationSeconds(attempt.getUser().getId(), attempt.getTest().getId())),
                 weakTopics,
                 recommendation,
                 aiReviewService.review(attempt.getId()),
@@ -259,5 +284,30 @@ public class AttemptService {
         private static AnswerCheck strict(boolean correct) {
             return new AnswerCheck(correct, false, null, null);
         }
+    }
+
+    private long durationSeconds(TestAttempt attempt) {
+        if (attempt.getDurationSeconds() != null) {
+            return attempt.getDurationSeconds();
+        }
+        if (attempt.getCompletedAt() == null) {
+            return Duration.between(attempt.getStartedAt(), Instant.now()).toSeconds();
+        }
+        return Duration.between(attempt.getStartedAt(), attempt.getCompletedAt()).toSeconds();
+    }
+
+    private long bestDurationSeconds(Long userId, Long testId) {
+        return attempts.findByUserIdAndTestIdAndStatus(userId, testId, AttemptStatus.COMPLETED).stream()
+                .mapToLong(this::durationSeconds)
+                .min()
+                .orElse(0);
+    }
+
+    private String formatDuration(long seconds) {
+        long safeSeconds = Math.max(0, seconds);
+        long hours = safeSeconds / 3600;
+        long minutes = (safeSeconds % 3600) / 60;
+        long remainingSeconds = safeSeconds % 60;
+        return "%02d.%02d.%02d".formatted(hours, minutes, remainingSeconds);
     }
 }

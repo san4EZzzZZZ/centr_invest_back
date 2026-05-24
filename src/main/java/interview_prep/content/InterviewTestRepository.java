@@ -16,6 +16,24 @@ public interface InterviewTestRepository extends JpaRepository<InterviewTest, Lo
     @Query("""
             select test from InterviewTest test
             join fetch test.profession profession
+            where profession.id = :professionId
+            order by test.title
+            """)
+    List<InterviewTest> findByLanguageIdWithLanguage(@Param("professionId") Long professionId);
+
+    @Query("""
+            select test from InterviewTest test
+            join fetch test.profession profession
+            where profession.id = :professionId
+              and lower(test.title) like lower(concat('%', :title, '%'))
+            order by test.title
+            """)
+    List<InterviewTest> searchByLanguageIdAndTitle(@Param("professionId") Long professionId,
+                                                   @Param("title") String title);
+
+    @Query("""
+            select test from InterviewTest test
+            join fetch test.profession profession
             order by profession.title, test.title
             """)
     List<InterviewTest> findAllWithLanguage();
