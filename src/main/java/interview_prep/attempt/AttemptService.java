@@ -140,6 +140,7 @@ public class AttemptService {
                 generatedExplanation.generatedByAi(),
                 answerCheck.checkedByAi(),
                 answerCheck.aiConfidence(),
+                answerCheck.correctOptionIds(),
                 answerCheck.matchingResults(),
                 nextQuestion == null ? null : mapper.toQuestionResponse(nextQuestion),
                 result
@@ -230,7 +231,7 @@ public class AttemptService {
             Set<Long> actual = request.selectedOptionIds() == null
                     ? Set.of()
                     : new HashSet<>(request.selectedOptionIds());
-            return AnswerCheck.strict(expected.equals(actual));
+            return AnswerCheck.choice(expected.equals(actual), expected.stream().sorted().toList());
         }
         if (question.getType() == QuestionType.MATCHING) {
             Map<String, String> expected = pairs.findByQuestionIdOrderById(question.getId()).stream()
@@ -250,6 +251,7 @@ public class AttemptService {
                 evaluation.checkedByAi(),
                 evaluation.confidence(),
                 evaluation.reason(),
+                null,
                 null
         );
     }
@@ -289,13 +291,17 @@ public class AttemptService {
     }
 
     private record AnswerCheck(boolean correct, boolean checkedByAi, Double aiConfidence, String aiReason,
-                               Map<String, Boolean> matchingResults) {
+                               List<Long> correctOptionIds, Map<String, Boolean> matchingResults) {
         private static AnswerCheck strict(boolean correct) {
-            return new AnswerCheck(correct, false, null, null, null);
+            return new AnswerCheck(correct, false, null, null, null, null);
+        }
+
+        private static AnswerCheck choice(boolean correct, List<Long> correctOptionIds) {
+            return new AnswerCheck(correct, false, null, null, correctOptionIds, null);
         }
 
         private static AnswerCheck matching(boolean correct, Map<String, Boolean> matchingResults) {
-            return new AnswerCheck(correct, false, null, null, matchingResults);
+            return new AnswerCheck(correct, false, null, null, null, matchingResults);
         }
     }
 

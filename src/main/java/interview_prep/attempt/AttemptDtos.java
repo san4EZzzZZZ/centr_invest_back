@@ -26,6 +26,7 @@ public class AttemptDtos {
             boolean explanationGeneratedByAi,
             boolean checkedByAi,
             Double aiConfidence,
+            List<Long> correctOptionIds,
             Map<String, Boolean> matchingResults,
             ContentDtos.QuestionResponse nextQuestion,
             ResultResponse result
