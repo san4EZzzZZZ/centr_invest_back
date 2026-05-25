@@ -71,13 +71,17 @@ public class QuestionBankInitializer implements CommandLineRunner {
         return tests.findByProfessionIdOrderByTitle(language.getId()).stream()
                 .filter(test -> test.getTitle().equals(title))
                 .findFirst()
-                .orElseGet(() -> tests.save(new InterviewTest(
-                        language,
-                        owner,
-                        title,
-                        title,
-                        title
-                )));
+                .orElseGet(() -> {
+                    InterviewTest test = new InterviewTest(
+                            language,
+                            owner,
+                            title,
+                            title,
+                            title
+                    );
+                    test.setPublished(true);
+                    return tests.save(test);
+                });
     }
 
     private void saveQuestion(Profession language, InterviewTest test, BankQuestion row) {

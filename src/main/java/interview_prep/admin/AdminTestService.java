@@ -69,6 +69,7 @@ public class AdminTestService {
                         test.getTitle(),
                         test.getShortDescription(),
                         test.getDescription(),
+                        test.isPublished(),
                         (int) questions.countByTestId(test.getId())
                 ))
                 .toList();
@@ -198,6 +199,7 @@ public class AdminTestService {
                 test.getTitle(),
                 test.getShortDescription(),
                 test.getDescription(),
+                test.isPublished(),
                 questions.findByTestIdOrderByPosition(test.getId()).stream()
                         .map(this::toQuestionDetails)
                         .toList()

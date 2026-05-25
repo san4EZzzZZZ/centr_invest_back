@@ -46,6 +46,7 @@ public class AdminDtos {
             String title,
             String shortDescription,
             String description,
+            boolean published,
             int questionCount
     ) {
     }
@@ -59,6 +60,7 @@ public class AdminDtos {
             String title,
             String shortDescription,
             String description,
+            boolean published,
             List<QuestionDetailsResponse> questions
     ) {
     }

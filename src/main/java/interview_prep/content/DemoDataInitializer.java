@@ -91,9 +91,11 @@ public class DemoDataInitializer implements CommandLineRunner {
 
     private void assignLegacyTestsToSuperAdmin(UserAccount superAdmin) {
         tests.findAll().stream()
-                .filter(test -> test.getCreatedBy() == null)
                 .forEach(test -> {
-                    test.setCreatedBy(superAdmin);
+                    if (test.getCreatedBy() == null) {
+                        test.setCreatedBy(superAdmin);
+                    }
+                    test.setPublished(true);
                     tests.save(test);
                 });
     }

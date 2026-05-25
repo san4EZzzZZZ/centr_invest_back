@@ -36,6 +36,9 @@ public class InterviewTest {
     @Column(nullable = false, length = 800)
     private String description;
 
+    @Column(nullable = false)
+    private boolean published = false;
+
     public InterviewTest(Profession profession, String title, String shortDescription, String description) {
         this.profession = profession;
         this.title = title;
