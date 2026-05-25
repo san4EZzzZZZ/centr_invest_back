@@ -140,6 +140,7 @@ public class AttemptService {
                 generatedExplanation.generatedByAi(),
                 answerCheck.checkedByAi(),
                 answerCheck.aiConfidence(),
+                answerCheck.matchingResults(),
                 nextQuestion == null ? null : mapper.toQuestionResponse(nextQuestion),
                 result
         );
@@ -234,7 +235,13 @@ public class AttemptService {
         if (question.getType() == QuestionType.MATCHING) {
             Map<String, String> expected = pairs.findByQuestionIdOrderById(question.getId()).stream()
                     .collect(Collectors.toMap(pair -> pair.getLeftLabel(), pair -> pair.getRightLabel()));
-            return AnswerCheck.strict(expected.equals(request.matches() == null ? Map.of() : request.matches()));
+            Map<String, String> actual = request.matches() == null ? Map.of() : request.matches();
+            Map<String, Boolean> matchingResults = expected.entrySet().stream()
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            entry -> Objects.equals(entry.getValue(), actual.get(entry.getKey()))
+                    ));
+            return AnswerCheck.matching(expected.equals(actual), matchingResults);
         }
         ShortTextAnswerReviewService.Evaluation evaluation =
                 shortTextAnswerReviewService.evaluate(question, request.textAnswer());
@@ -242,7 +249,8 @@ public class AttemptService {
                 evaluation.correct(),
                 evaluation.checkedByAi(),
                 evaluation.confidence(),
-                evaluation.reason()
+                evaluation.reason(),
+                null
         );
     }
 
@@ -280,9 +288,14 @@ public class AttemptService {
         );
     }
 
-    private record AnswerCheck(boolean correct, boolean checkedByAi, Double aiConfidence, String aiReason) {
+    private record AnswerCheck(boolean correct, boolean checkedByAi, Double aiConfidence, String aiReason,
+                               Map<String, Boolean> matchingResults) {
         private static AnswerCheck strict(boolean correct) {
-            return new AnswerCheck(correct, false, null, null);
+            return new AnswerCheck(correct, false, null, null, null);
+        }
+
+        private static AnswerCheck matching(boolean correct, Map<String, Boolean> matchingResults) {
+            return new AnswerCheck(correct, false, null, null, matchingResults);
         }
     }
 

@@ -4,6 +4,7 @@ import interview_prep.content.ContentDtos;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 public class AttemptDtos {
     public record StartAttemptResponse(Long attemptId, ContentDtos.QuestionResponse question) {
@@ -25,6 +26,7 @@ public class AttemptDtos {
             boolean explanationGeneratedByAi,
             boolean checkedByAi,
             Double aiConfidence,
+            Map<String, Boolean> matchingResults,
             ContentDtos.QuestionResponse nextQuestion,
             ResultResponse result
     ) {
