@@ -95,6 +95,7 @@ public class AdminTestService {
                 request.shortDescription().trim(),
                 request.description().trim()
         ));
+        test.setPublished(true);
         saveQuestions(test, request.questions());
         return toDetails(test);
     }
@@ -115,6 +116,7 @@ public class AdminTestService {
         test.setTitle(request.title().trim());
         test.setShortDescription(request.shortDescription().trim());
         test.setDescription(request.description().trim());
+        test.setPublished(true);
         saveQuestions(test, request.questions());
         return toDetails(test);
     }
